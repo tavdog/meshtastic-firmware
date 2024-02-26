@@ -2,6 +2,7 @@
 #include "Observer.h"
 #include "SinglePortModule.h"
 
+
 /**
  * Text message handling for meshtastic - draws on the OLED display the most recent received message
  */

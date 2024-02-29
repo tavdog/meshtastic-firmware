@@ -24,6 +24,21 @@
 #include "mesh/generated/meshtastic/rtttl.pb.h"
 #include <Arduino.h>
 
+#include <MD_Parola.h> // library, depends on MD_MAX72XX
+#define HARDWARE_TYPE MD_MAX72XX::FC16_HW
+#define MAX_DEVICES 4
+
+#define PAUSE_TIME    1000
+#define SCROLL_SPEED  100
+
+#define CLK_PIN   5
+#define DATA_PIN  27
+#define CS_PIN    23
+
+MD_Parola parola = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
+
+
+
 #ifdef HAS_NCP5623
 #include <graphics/RAKled.h>
 
@@ -258,6 +273,7 @@ ExternalNotificationModule::ExternalNotificationModule()
     : SinglePortModule("ExternalNotificationModule", meshtastic_PortNum_TEXT_MESSAGE_APP),
       concurrency::OSThread("ExternalNotificationModule")
 {
+
     /*
         Uncomment the preferences below if you want to use the module
         without having to configure it from the PythonAPI or WebUI.
@@ -284,6 +300,11 @@ ExternalNotificationModule::ExternalNotificationModule()
     // moduleConfig.external_notification.alert_message_buzzer = true;
 
     if (moduleConfig.external_notification.enabled) {
+
+        parola.begin();
+        parola.displayScroll(" WindyTron Mesh",PA_CENTER, PA_SCROLL_LEFT, 50);
+        while (parola.displayAnimate() != true) {delay(1);}
+
         if (!nodeDB.loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),
                               &meshtastic_RTTTLConfig_msg, &rtttlConfig)) {
             memset(rtttlConfig.ringtone, 0, sizeof(rtttlConfig.ringtone));
@@ -402,6 +423,18 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
 
             if (moduleConfig.external_notification.alert_message) {
                 LOG_INFO("externalNotificationModule - Notification Module\n");
+                auto &p = mp.decoded;
+
+                static char msg[70];
+                sprintf(msg, "%s", p.payload.bytes);
+                int slength = String(msg).length()+1;
+                if (slength < 7) {
+                    parola.displayText(msg, PA_CENTER, 100, PAUSE_TIME, PA_FADE);
+                } else {
+                    parola.displayScroll(msg,PA_CENTER, PA_SCROLL_LEFT, 50);
+                }
+                while (parola.displayAnimate() != true) {delay(1);}
+
                 isNagging = true;
                 setExternalOn(0);
                 if (moduleConfig.external_notification.nag_timeout) {

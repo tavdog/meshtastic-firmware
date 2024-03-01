@@ -25,6 +25,8 @@
 #include <Arduino.h>
 
 #include <MD_Parola.h> // library, depends on MD_MAX72XX
+#include "graphics/img/ledmatrix.h"
+
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES 4
 
@@ -423,18 +425,7 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
 
             if (moduleConfig.external_notification.alert_message) {
                 LOG_INFO("externalNotificationModule - Notification Module\n");
-                auto &p = mp.decoded;
-
-                static char msg[70];
-                sprintf(msg, "%s", p.payload.bytes);
-                int slength = String(msg).length()+1;
-                if (slength < 7) {
-                    parola.displayText(msg, PA_CENTER, 100, PAUSE_TIME, PA_FADE);
-                } else {
-                    parola.displayScroll(msg,PA_CENTER, PA_SCROLL_LEFT, 50);
-                }
-                while (parola.displayAnimate() != true) {delay(1);}
-
+                displayWind(mp);
                 isNagging = true;
                 setExternalOn(0);
                 if (moduleConfig.external_notification.nag_timeout) {
@@ -541,4 +532,123 @@ void ExternalNotificationModule::handleSetRingtone(const char *from_msg)
     if (changed) {
         nodeDB.saveProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, &meshtastic_RTTTLConfig_msg, &rtttlConfig);
     }
+}
+
+void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
+{
+
+    auto &p = mp.decoded;
+    static char msg[70];
+    sprintf(msg, "%s", p.payload.bytes);
+    if (strcmp(msg, last_data) == 0 ) return; // don't re-display duplicate info
+    strcpy(last_data, msg);
+    int slength = strlen(msg)+1;
+    if (slength < 7) {
+        parola.displayText(msg, PA_CENTER, 100, PAUSE_TIME, PA_FADE);
+    } else {
+        parola.displayScroll(msg,PA_CENTER, PA_SCROLL_LEFT, 50);
+    }
+    while (parola.displayAnimate() != true) {delay(1);}
+    
+    // parse the wind string
+    // NE 51 20g25 , 0.7f,7s,ENE72 - 2021-06-29T16:10:07
+    char data[70];  // Adjust the size according to your needs
+
+    // Copy the content of msg to data
+    strcpy(data, msg);
+
+    // Tokenize the data using strtok
+    char *token = strtok(data, " ");
+    char *dir = token;
+    token = strtok(NULL, " ");
+    int degree = atoi(token);
+    token = strtok(NULL, "g");
+    int avg = atoi(token);
+    token = strtok(NULL, ",");
+    int gust = atoi(token);
+
+    uint8_t *d;
+    //char dir[3];
+    // get the direction graphic
+    //strcmp(dir, "N") == 0
+    if (strcmp(dir,"N") == 0) {
+        d = m_N;
+    } else if ( strcmp(dir,"NE") == 0) {
+    //spl("dir is NE");
+    // now lets check for degrees
+        if        ( 33 <= degree && degree <= 37 ) {
+        //spl("almost NNE");
+        d = m_NE1;
+        } else if ( 38 <= degree && degree <= 42 ) {
+        //spl("more north");
+        d = m_NE2;
+        } else if ( 43 <= degree && degree <= 47 ) {
+        //spl("perfect NE");
+        d = m_NE3;
+        } else if ( 48 <= degree && degree <= 52 ) {
+        //spl("more east");
+        d = m_NE4;
+        } else if ( 51 <= degree && degree <= 56) {
+        //spl("almost ENE");
+        d = m_NE5;
+        } else {
+        d = m_NE3;
+        //spl("doing default");
+        }
+    } else if ( strcmp(dir,"NNE") == 0) {
+        d = m_NNE;
+    } else if ( strcmp(dir,"NW") == 0) {
+        d = m_NW;
+    } else if ( strcmp(dir,"NNW") == 0) {
+        d = m_NNW;
+    } else if ( strcmp(dir,"ENE") == 0) {
+        d = m_ENE;
+    } else if ( strcmp(dir,"E") == 0) {
+        d = m_E;
+    } else if ( strcmp(dir,"ESE") == 0) {
+        d = m_ESE;
+    } else if ( strcmp(dir,"WSW") == 0) {
+        d = m_WSW;
+    } else if ( strcmp(dir,"S") == 0) {
+        d = m_S;
+    } else if ( strcmp(dir,"SE") == 0) {
+        d = m_SE;
+    } else if ( strcmp(dir,"SSE") == 0) {
+        d = m_SSE;
+    } else if ( strcmp(dir,"SW") == 0) {
+        d = m_SW;
+    } else if ( strcmp(dir,"SSW") == 0) {
+        d = m_SSW;
+    } else if ( strcmp(dir,"W") == 0) {
+        d = m_W;
+    } else if ( strcmp(dir,"WNW") == 0) {
+        d = m_WNW;
+    } else {
+        d = m_N;
+    }
+    int start_pos = 0;
+    
+    // Define a character array for the avg_g_gust string
+    char avg_g_gust[10];  // Adjust the size according to your needs
+
+    // Generate the avg_g_gust string
+    if (avg < 10 && gust < 10) {
+        sprintf(avg_g_gust, " %dg%d ", avg, gust);
+    } else if (avg < 10) {
+        sprintf(avg_g_gust, "%dgust", avg);
+    } else if (avg < 20 && gust < 20) {
+        sprintf(avg_g_gust, "%d %d", avg, gust);
+    } else {
+        sprintf(avg_g_gust, "%d%d", avg, gust);
+}
+    
+    parola.displayText(avg_g_gust, PA_RIGHT, 100, 0, PA_NO_EFFECT);
+    while(parola.displayAnimate() != true) {delay(1);}
+
+    for (int i = 1 ; i < 8 ; i++) {
+        parola.getGraphicObject()->setColumn(3,start_pos+i, d[8-i]);
+    }
+
+    parola.getGraphicObject()->update();
+
 }

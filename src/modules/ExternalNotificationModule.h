@@ -55,10 +55,13 @@ class ExternalNotificationModule : public SinglePortModule, private concurrency:
     virtual bool wantPacket(const meshtastic_MeshPacket *p) override;
 
     bool isNagging = false;
+    char last_data[70];
 
     virtual AdminMessageHandleResult handleAdminMessageForModule(const meshtastic_MeshPacket &mp,
                                                                  meshtastic_AdminMessage *request,
                                                                  meshtastic_AdminMessage *response) override;
+
+    void displayWind(const meshtastic_MeshPacket &mp);
 };
 
 extern ExternalNotificationModule *externalNotificationModule;

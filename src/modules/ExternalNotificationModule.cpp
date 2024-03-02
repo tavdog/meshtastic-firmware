@@ -571,12 +571,13 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     int degree = atoi(token);
     token = strtok(NULL, "g");
     int avg = atoi(token);
-    token = strtok(NULL, ", ");
+    token = strtok(NULL, " ");
     int gust = atoi(token);
 
     char avg_g_gust[10];  // Adjust the size according to your needs
     sprintf(avg_g_gust, " %dg%d ", avg, gust);
 
+    token = strtok(NULL, " ");  // throwaway the comma surrounded by spaces
     // Continue tokenization for AUX1 and AUX2
     token = strtok(NULL, "_");
     char aux1[24] = "-";  // Assuming aux1 can be a maximum of 23 characters
@@ -652,7 +653,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
     // DISPLAY LABEL
     display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(65, 16);
+    display.setCursor(84, 16);
     display.setTextColor(EPD_BLACK);
     display.print("Kanaha");
 

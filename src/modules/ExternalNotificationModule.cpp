@@ -24,21 +24,23 @@
 #include "mesh/generated/meshtastic/rtttl.pb.h"
 #include <Arduino.h>
 
-#include <MD_Parola.h> // library, depends on MD_MAX72XX
-#include "graphics/img/ledmatrix.h"
+#include "graphics/img/epd_img.h"
+#include "Adafruit_ThinkInk.h"
+#include <Fonts/FreeMonoBold24pt7b.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
+#include <Fonts/FreeMonoBold12pt7b.h>
+#include <Fonts/FreeMonoBold9pt7b.h>
 
-#define HARDWARE_TYPE MD_MAX72XX::FC16_HW
-#define MAX_DEVICES 4
+//#define SD_CS    PIN_PB5  // none
+//#define SRAM_CS  PIN_PE1   // orange
+#define EPD_CS   23  // purple
+#define EPD_DC   33  // blue
+// MOSI : 27
+// CLK : 5
+// MISO : 19
 
-#define PAUSE_TIME    1000
-#define SCROLL_SPEED  100
-
-#define CLK_PIN   5
-#define DATA_PIN  27
-#define CS_PIN    23
-
-MD_Parola parola = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
-
+//Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
+ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
 
 
 #ifdef HAS_NCP5623
@@ -303,9 +305,19 @@ ExternalNotificationModule::ExternalNotificationModule()
 
     if (moduleConfig.external_notification.enabled) {
 
-        parola.begin();
-        parola.displayScroll(" WindyTron Mesh",PA_CENTER, PA_SCROLL_LEFT, 50);
-        while (parola.displayAnimate() != true) {delay(1);}
+        // startup the epd
+        display.begin();
+        display.clearBuffer();
+        display.setRotation(3);
+        display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);    
+        display.setRotation(0);
+        display.setFont(&FreeMonoBold12pt7b);
+        display.setTextColor(EPD_BLACK);
+        display.setCursor(115, 48);
+        display.print("MauiMesh");
+        display.display();
+        LOG_INFO("DID EPD");
+
 
         if (!nodeDB.loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),
                               &meshtastic_RTTTLConfig_msg, &rtttlConfig)) {
@@ -425,6 +437,7 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
 
             if (moduleConfig.external_notification.alert_message) {
                 LOG_INFO("externalNotificationModule - Notification Module\n");
+                LOG_INFO("DISPLAY_WIND");
                 displayWind(mp);
                 isNagging = true;
                 setExternalOn(0);
@@ -537,21 +550,15 @@ void ExternalNotificationModule::handleSetRingtone(const char *from_msg)
 void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 {
 
+    display.clearBuffer();
     auto &p = mp.decoded;
     static char msg[70];
     sprintf(msg, "%s", p.payload.bytes);
     if (strcmp(msg, last_data) == 0 ) return; // don't re-display duplicate info
     strcpy(last_data, msg);
-    int slength = strlen(msg)+1;
-    if (slength < 7) {
-        parola.displayText(msg, PA_CENTER, 100, PAUSE_TIME, PA_FADE);
-    } else {
-        parola.displayScroll(msg,PA_CENTER, PA_SCROLL_LEFT, 50);
-    }
-    while (parola.displayAnimate() != true) {delay(1);}
     
     // parse the wind string
-    // NE 51 20g25 , 0.7f,7s,ENE72 - 2021-06-29T16:10:07
+    // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07
     char data[70];  // Adjust the size according to your needs
 
     // Copy the content of msg to data
@@ -564,91 +571,112 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     int degree = atoi(token);
     token = strtok(NULL, "g");
     int avg = atoi(token);
-    token = strtok(NULL, ",");
+    token = strtok(NULL, ", ");
     int gust = atoi(token);
 
-    uint8_t *d;
-    //char dir[3];
-    // get the direction graphic
-    //strcmp(dir, "N") == 0
-    if (strcmp(dir,"N") == 0) {
-        d = m_N;
-    } else if ( strcmp(dir,"NE") == 0) {
-    //spl("dir is NE");
-    // now lets check for degrees
-        if        ( 33 <= degree && degree <= 37 ) {
-        //spl("almost NNE");
-        d = m_NE1;
-        } else if ( 38 <= degree && degree <= 42 ) {
-        //spl("more north");
-        d = m_NE2;
-        } else if ( 43 <= degree && degree <= 47 ) {
-        //spl("perfect NE");
-        d = m_NE3;
-        } else if ( 48 <= degree && degree <= 52 ) {
-        //spl("more east");
-        d = m_NE4;
-        } else if ( 51 <= degree && degree <= 56) {
-        //spl("almost ENE");
-        d = m_NE5;
-        } else {
-        d = m_NE3;
-        //spl("doing default");
-        }
-    } else if ( strcmp(dir,"NNE") == 0) {
-        d = m_NNE;
-    } else if ( strcmp(dir,"NW") == 0) {
-        d = m_NW;
-    } else if ( strcmp(dir,"NNW") == 0) {
-        d = m_NNW;
-    } else if ( strcmp(dir,"ENE") == 0) {
-        d = m_ENE;
-    } else if ( strcmp(dir,"E") == 0) {
-        d = m_E;
-    } else if ( strcmp(dir,"ESE") == 0) {
-        d = m_ESE;
-    } else if ( strcmp(dir,"WSW") == 0) {
-        d = m_WSW;
-    } else if ( strcmp(dir,"S") == 0) {
-        d = m_S;
-    } else if ( strcmp(dir,"SE") == 0) {
-        d = m_SE;
-    } else if ( strcmp(dir,"SSE") == 0) {
-        d = m_SSE;
-    } else if ( strcmp(dir,"SW") == 0) {
-        d = m_SW;
-    } else if ( strcmp(dir,"SSW") == 0) {
-        d = m_SSW;
-    } else if ( strcmp(dir,"W") == 0) {
-        d = m_W;
-    } else if ( strcmp(dir,"WNW") == 0) {
-        d = m_WNW;
-    } else {
-        d = m_N;
-    }
-    int start_pos = 0;
-    
-    // Define a character array for the avg_g_gust string
     char avg_g_gust[10];  // Adjust the size according to your needs
+    sprintf(avg_g_gust, " %dg%d ", avg, gust);
 
-    // Generate the avg_g_gust string
-    if (avg < 10 && gust < 10) {
-        sprintf(avg_g_gust, " %dg%d ", avg, gust);
-    } else if (avg < 10) {
-        sprintf(avg_g_gust, "%dgust", avg);
-    } else if (avg < 20 && gust < 20) {
-        sprintf(avg_g_gust, "%d %d", avg, gust);
-    } else {
-        sprintf(avg_g_gust, "%d%d", avg, gust);
-}
+    // Continue tokenization for AUX1 and AUX2
+    token = strtok(NULL, "_");
+    char aux1[24] = "-";  // Assuming aux1 can be a maximum of 23 characters
+    if (token != nullptr) {
+        strncpy(aux1, token, 23);
+        aux1[23] = '\0';  // Null-terminate the aux1 string
+    }
     
-    parola.displayText(avg_g_gust, PA_RIGHT, 100, 0, PA_NO_EFFECT);
-    while(parola.displayAnimate() != true) {delay(1);}
-
-    for (int i = 1 ; i < 8 ; i++) {
-        parola.getGraphicObject()->setColumn(3,start_pos+i, d[8-i]);
+    // Tokenize again to get AUX2
+    token = strtok(NULL, " -");
+    char aux2[24] = "-";  // Assuming aux2 can be a maximum of 23 characters
+    if (token != nullptr) {
+        strncpy(aux2, token, 23);
+        aux2[23] = '\0';  // Null-terminate the aux2 string
     }
 
-    parola.getGraphicObject()->update();
+    // DISPLAY THE TIMESTAMP    
+    // Find the position of the 'T' character
+    const char* timeStart = strstr(msg, "T");
+    // Create a buffer to store the time
+    char timeBuffer[6];
+    if (timeStart != nullptr) {
+        // Move one position ahead to point to the start of the time (hour)
+        timeStart += 1;
 
+        // Create a buffer to store the time
+        char timeBuffer[6];
+
+        // Copy the time to the buffer
+        strncpy(timeBuffer, timeStart, 5);
+
+        // Null-terminate the buffer
+        timeBuffer[5] = '\0';
+    }
+
+   
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setCursor(180, 16);
+    display.setTextColor(EPD_BLACK);
+    display.print(timeBuffer);
+
+    // display.setFont(&FreeMonoBold12pt7b);
+    // display.setCursor(85, 16);
+    // display.setTextColor(EPD_BLACK);
+    // display.print(s);
+
+    // DISPLAY VELOCITY
+    display.setFont(&FreeMonoBold24pt7b);
+    display.setCursor(60, 60);
+    display.setTextColor(EPD_BLACK);
+    display.print(avg_g_gust);
+    display.setFont(&FreeMonoBold9pt7b);
+  
+    // DISPLAY DIR
+    display.setFont(&FreeMonoBold18pt7b);
+    display.setCursor(5, 30);
+    display.setTextColor(EPD_BLACK);
+    display.print(dir);
+    display.setCursor(5,60);
+    display.print(degree);  
+
+    // DISPLAY AUX1
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setCursor(10, 90);
+    display.setTextColor(EPD_BLACK);
+    display.print(aux1); 
+
+    //  DISPLAY AUX2
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setCursor(10, 117);
+    display.setTextColor(EPD_BLACK);
+    display.print(aux2);
+
+    // DISPLAY LABEL
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setCursor(65, 16);
+    display.setTextColor(EPD_BLACK);
+    display.print("Kanaha");
+
+    display.display();
+
+// void show_data(String data)  {
+//   // parse the message as json
+//   if (last_message.equals(data)) return;
+//   StaticJsonDocument<512> doc;
+//   deserializeJson(doc, data.c_str());
+//   // json data looks like : {"avg": 7, "gust": 10, "lull": 4, "dir_card": "WSW", "dir_deg": 257, "stamp": "2023-10-21T20:37:44", "aux1": "2.6f,10s,N357", "aux2": "0907H2.2", "label": "Kanaha"}
+//   display.clearBuffer();
+//   String stamp = doc["stamp"];
+//   String hour = stamp.substring(stamp.indexOf('T')+1,stamp.indexOf(':'));
+//   String min = stamp.substring(stamp.indexOf(':')+1,stamp.indexOf(':')+3);
+//   String avg_g_gust = String(doc["avg"]) + "g" + String(doc["gust"]);
+//   display_location(String(doc["label"]));
+
+//   display_dir(doc["dir_card"],doc["dir_deg"]);
+//   display_vel(avg_g_gust);
+//   display_time(min.toInt(),hour.toInt());
+//   display_aux1(doc["aux1"]);
+//   display_aux2(doc["aux2"]);
+//   display.display();
+//   last_message = String(data);
+// }
 }

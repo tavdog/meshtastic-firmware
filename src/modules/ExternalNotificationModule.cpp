@@ -31,16 +31,16 @@
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include <Fonts/FreeMonoBold9pt7b.h>
 
-//#define SD_CS    PIN_PB5  // none
-//#define SRAM_CS  PIN_PE1   // orange
-#define EPD_CS   23  // purple
-#define EPD_DC   33  // blue
+// DEFINE THESE IN PIO.INI
+//#define EPD_CS   23  // purple
+//#define EPD_DC   33  // blue
+
 // MOSI : 27
 // CLK : 5
 // MISO : 19
 
-//Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
-ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
+Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
+//ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
 
 
 #ifdef HAS_NCP5623

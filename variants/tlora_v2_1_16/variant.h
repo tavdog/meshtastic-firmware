@@ -26,3 +26,5 @@
 #endif
 
 #define LORA_DIO2 32 // Not really used
+#define EPD_CS 13
+#define EPD_DC 12

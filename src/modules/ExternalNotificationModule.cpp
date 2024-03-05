@@ -442,6 +442,9 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                     LOG_INFO("DISPLAY_WIND");
 
                     displayWind(mp);
+                } else {
+                    LOG_INFO("DISPLAY_TEXT");
+                    displayText(mp);
                 }
                 isNagging = true;
                 setExternalOn(0);
@@ -684,4 +687,28 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 //   display.display();
 //   last_message = String(data);
 // }
+}
+void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
+{
+
+    display.clearBuffer();
+    auto &p = mp.decoded;
+    static char msg[256];
+    sprintf(msg, "%s", p.payload.bytes);
+    if (strcmp(msg, last_data) == 0 ) return; // don't re-display duplicate info
+    strcpy(last_data, msg);
+    
+    // parse the wind string
+    // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07
+    char data[70];  // Adjust the size according to your needs
+
+  
+    // DISPLAY Text
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setCursor(10, 20);
+    display.setTextColor(EPD_BLACK);
+    display.print(msg); 
+
+    display.display();
+
 }

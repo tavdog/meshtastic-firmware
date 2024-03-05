@@ -437,8 +437,12 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
 
             if (moduleConfig.external_notification.alert_message) {
                 LOG_INFO("externalNotificationModule - Notification Module\n");
-                LOG_INFO("DISPLAY_WIND");
-                displayWind(mp);
+                LOG_INFO("FromID : 0x%0x\n", mp.from);
+                if (mp.from == 0xa3251978) {
+                    LOG_INFO("DISPLAY_WIND");
+
+                    displayWind(mp);
+                }
                 isNagging = true;
                 setExternalOn(0);
                 if (moduleConfig.external_notification.nag_timeout) {

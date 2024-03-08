@@ -3,6 +3,7 @@
   "editor.defaultFormatter": "trunk.io",
   "trunk.enableWindows": true,
   "files.associations": {
-    "complex": "cpp"
+    "complex": "cpp",
+    "*.tpp": "cpp"
   }
 }

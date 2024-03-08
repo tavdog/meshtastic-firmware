@@ -442,10 +442,12 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                     LOG_INFO("DISPLAY_WIND");
 
                     displayWind(mp);
+                    return ProcessMessage::STOP; // Just display and then stop.
                 } else {
                     LOG_INFO("DISPLAY_TEXT");
                     displayText(mp);
                 }
+
                 isNagging = true;
                 setExternalOn(0);
                 if (moduleConfig.external_notification.nag_timeout) {
@@ -700,8 +702,6 @@ void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
     
     // parse the wind string
     // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07
-    char data[70];  // Adjust the size according to your needs
-
   
     // DISPLAY Text
     display.setFont(&FreeMonoBold12pt7b);

@@ -304,7 +304,7 @@ ExternalNotificationModule::ExternalNotificationModule()
     // moduleConfig.external_notification.alert_message_buzzer = true;
 
     if (moduleConfig.external_notification.enabled) {
-
+//#define UPSIDE_DOWN
         // startup the epd
         display.begin();
         display.clearBuffer();
@@ -314,7 +314,11 @@ ExternalNotificationModule::ExternalNotificationModule()
         display.setRotation(3);
         #endif
         display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);    
+        #ifdef UPSIDE_DOWN
+        display.setRotation(2);
+        #else
         display.setRotation(0);
+        #endif
         display.setFont(&FreeMonoBold12pt7b);
         display.setTextColor(EPD_BLACK);
         display.setCursor(115, 48);
@@ -446,6 +450,7 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                     LOG_INFO("DISPLAY_WIND");
 
                     displayWind(mp);
+                    
                 } else {
                     LOG_INFO("DISPLAY_TEXT");
                     displayText(mp);

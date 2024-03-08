@@ -448,8 +448,8 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                 LOG_INFO("FromID : 0x%0x\n", mp.from);
                 if (mp.from == 0xa3251978) {
                     LOG_INFO("DISPLAY_WIND");
-
                     displayWind(mp);
+                    return ProcessMessage::STOP; // Just display and then stop.
                     
                 } else {
                     LOG_INFO("DISPLAY_TEXT");

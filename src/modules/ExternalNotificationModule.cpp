@@ -308,7 +308,11 @@ ExternalNotificationModule::ExternalNotificationModule()
         // startup the epd
         display.begin();
         display.clearBuffer();
+        #ifdef UPSIDE_DOWN
+        display.setRotation(1);
+        #else
         display.setRotation(3);
+        #endif
         display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);    
         display.setRotation(0);
         display.setFont(&FreeMonoBold12pt7b);

@@ -35,9 +35,8 @@
 //#define EPD_CS   23  // purple
 //#define EPD_DC   33  // blue
 
-// MOSI : 27
-// CLK : 5
-// MISO : 19
+#define EPD_CS 5
+#define EPD_DC 0
 #ifdef OLD_EPD
 Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
 #else  
@@ -284,12 +283,12 @@ ExternalNotificationModule::ExternalNotificationModule()
         without having to configure it from the PythonAPI or WebUI.
     */
 
-    // moduleConfig.external_notification.alert_message = true;
+    moduleConfig.external_notification.alert_message = true;
     // moduleConfig.external_notification.alert_message_buzzer = true;
     // moduleConfig.external_notification.alert_message_vibra = true;
     // moduleConfig.external_notification.use_i2s_as_buzzer = true;
 
-    // moduleConfig.external_notification.active = true;
+    moduleConfig.external_notification.active = true;
     // moduleConfig.external_notification.alert_bell = 1;
     // moduleConfig.external_notification.output_ms = 1000;
     // moduleConfig.external_notification.output = 4; // RAK4631 IO4
@@ -305,6 +304,9 @@ ExternalNotificationModule::ExternalNotificationModule()
     // moduleConfig.external_notification.alert_message_buzzer = true;
 
     if (moduleConfig.external_notification.enabled) {
+
+        SPI.end();
+        SPI.begin(EPD_SCK, EPD_MISO,EPD_MOSI,EPD_CS);
 
         LOG_INFO("DOING WINDYTRON_LOGO");
         // startup the epd

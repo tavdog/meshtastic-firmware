@@ -27,9 +27,11 @@
 #undef LORA_MISO
 #define LORA_MISO 19
 #undef LORA_MOSI
-#define LORA_MOSI 23
+#define LORA_MOSI 2
 #undef LORA_CS
 #define LORA_CS 5
+
+
 
 // RX/TX for RFM95/SX127x
 #define RF95_RXEN LORA_RXEN
@@ -56,5 +58,3 @@
 #define SX126X_DIO3_TCXO_VOLTAGE 1.8
 #endif
 
-#define OLD_EPD
-#define HAS_GPS=0

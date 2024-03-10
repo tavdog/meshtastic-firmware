@@ -1,3 +1,9 @@
+//#define OLD_EPD
+#define EPD_SCK 18
+#define EPD_MISO 19
+#define EPD_MOSI 2
+#define HAS_GPS 0
+
 // For OLED LCD
 #define I2C_SDA 21
 #define I2C_SCL 22

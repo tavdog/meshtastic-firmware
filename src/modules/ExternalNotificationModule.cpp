@@ -31,12 +31,8 @@
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include <Fonts/FreeMonoBold9pt7b.h>
 
-// DEFINE THESE IN PIO.INI
-//#define EPD_CS   23  // purple
-//#define EPD_DC   33  // blue
 
-#define EPD_CS 5
-#define EPD_DC 0
+
 #ifdef OLD_EPD
 Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
 #else  
@@ -325,10 +321,11 @@ ExternalNotificationModule::ExternalNotificationModule()
         display.setRotation(0);
         #endif
 
+        
         display.setFont(&FreeMonoBold12pt7b);
         display.setTextColor(EPD_BLACK);
         display.setCursor(115, 48);
-        display.print("MauiMesh");
+        display.print(devicestate.owner.long_name);
         display.display();
         LOG_INFO("DID EPD");
 

@@ -39,9 +39,11 @@
 // CLK : 5
 // MISO : 19
 
-Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
-//ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
-
+#ifdef OLD_EPD
+    Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
+#else
+    barfThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
+#endif
 
 #ifdef HAS_NCP5623
 #include <graphics/RAKled.h>
@@ -304,7 +306,6 @@ ExternalNotificationModule::ExternalNotificationModule()
     // moduleConfig.external_notification.alert_message_buzzer = true;
 
     if (moduleConfig.external_notification.enabled) {
-//#define UPSIDE_DOWN
         // startup the epd
         display.begin();
         display.clearBuffer();

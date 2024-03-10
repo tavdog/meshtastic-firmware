@@ -55,3 +55,6 @@
 // (which is the default for the sx1262interface code)
 #define SX126X_DIO3_TCXO_VOLTAGE 1.8
 #endif
+
+#define OLD_EPD
+#define HAS_GPS=0

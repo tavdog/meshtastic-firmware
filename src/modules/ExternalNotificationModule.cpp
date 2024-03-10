@@ -38,10 +38,11 @@
 // MOSI : 27
 // CLK : 5
 // MISO : 19
-
+#ifdef OLD_EPD
 Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
-//ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
-
+#else  
+ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
+#endif
 
 #ifdef HAS_NCP5623
 #include <graphics/RAKled.h>
@@ -305,16 +306,23 @@ ExternalNotificationModule::ExternalNotificationModule()
 
     if (moduleConfig.external_notification.enabled) {
 
+        LOG_INFO("DOING WINDYTRON_LOGO");
         // startup the epd
         display.begin();
         display.clearBuffer();
+
         #ifdef UPSIDE_DOWN
         display.setRotation(1);
         #else
         display.setRotation(3);
         #endif
         display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);    
+        #ifdef UPSIDE_DOWN
+        display.setRotation(2);
+        #else
         display.setRotation(0);
+        #endif
+
         display.setFont(&FreeMonoBold12pt7b);
         display.setTextColor(EPD_BLACK);
         display.setCursor(115, 48);

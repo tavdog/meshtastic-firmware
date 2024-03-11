@@ -1,5 +1,5 @@
 #define OLD_EPD
-#define UPSIDE_DOWN
+//#define UPSIDE_DOWN not used, using config.display.flip_screen
 #define EPD_SCK 18
 #define EPD_MISO 19
 #define EPD_MOSI 2

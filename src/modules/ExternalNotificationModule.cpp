@@ -309,18 +309,17 @@ ExternalNotificationModule::ExternalNotificationModule()
         display.begin();
         display.clearBuffer();
 
-        #ifdef UPSIDE_DOWN
-        display.setRotation(1);
-        #else
-        display.setRotation(3);
-        #endif
+        if (!config.display.flip_screen) {
+            display.setRotation(1);
+        } else {
+            display.setRotation(3);
+        }
         display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);    
-        #ifdef UPSIDE_DOWN
-        display.setRotation(2);
-        #else
-        display.setRotation(0);
-        #endif
-
+        if (!config.display.flip_screen) {
+            display.setRotation(2);
+        } else {
+            display.setRotation(0);
+        }
         
         display.setFont(&FreeMonoBold12pt7b);
         display.setTextColor(EPD_BLACK);

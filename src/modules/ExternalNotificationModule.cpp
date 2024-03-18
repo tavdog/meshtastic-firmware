@@ -31,10 +31,54 @@
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include <Fonts/FreeMonoBold9pt7b.h>
 
+#define NEOMATRIX
+// ######NEO_MATRIX_BLOCK######################################
+#ifdef NEOMATRIX
+#define M_WIDTH     32
+#define M_HEIGHT    8
+#define NUM_LEDS    (M_WIDTH * M_HEIGHT)
+#define DATA_PIN 2
 Adafruit_NeoMatrix m_matrix = Adafruit_NeoMatrix(M_WIDTH, M_HEIGHT, DATA_PIN,
 		NEO_MATRIX_TOP + NEO_MATRIX_LEFT +
 		NEO_MATRIX_COLUMNS + NEO_MATRIX_ZIGZAG,
 		NEO_GRB + NEO_KHZ800);
+// Color definitions
+#define BLACK    0x0000
+#define BLUE     0x001F
+#define RED      0xF800
+#define GREEN    0x07E0
+#define CYAN     0x07DD
+#define MAGENTA  0xF81F
+#define YELLOW   0xFFE0 
+#define WHITE    0xFFFF
+#define UPSIDE_DOWN 0
+// directions codes.  
+
+//const unsigned short m_N[256] = {};
+uint8_t  m_NE1[4] = { 5, 1, 5,0 }; // 
+uint8_t  m_NE2[4] = { 5, 1, 6,0 }; // 
+uint8_t  m_NE3[4] = { 5, 1, 7,0 }; // 
+uint8_t  m_NE4[4] = { 5, 1, 7,1 }; // 
+uint8_t  m_NE5[4] = { 5, 1, 7,2 }; //
+
+// since the center square is always in the same spot we only need to keep track of the second square's location.
+uint8_t  m_N[4] =   {3,1,0,0}; // N = !
+uint8_t  m_NNE[4] = {4,1,0,0}; // #
+uint8_t  m_NW [4] = {1,1,0,0}; // $
+uint8_t  m_NNW[4] = {2,1,0,0}; // %
+uint8_t  m_E  [4] = {5,3,0,0}; // ^
+uint8_t  m_ENE[4] = {5,2,0,0}; // &
+uint8_t  m_ESE[4] = {5,4,0,0}; // *
+uint8_t  m_WSW[4] = {1,4,0,0}; // (
+uint8_t  m_S  [4] = {3,5,0,0}; // )
+uint8_t  m_SE [4] = {5,5,0,0}; // _
+uint8_t  m_SSE[4] = {4,5,0,0}; // +
+uint8_t  m_SW [4] = {1,5,0,0}; // 
+uint8_t  m_SSW[4] = {2,5,0,0}; // 
+uint8_t  m_W  [4] = {1,3,0,0}; // 
+uint8_t  m_WNW[4] = {1,2,0,0}; // 
+
+#endif
 
 #ifdef HAS_NCP5623
 #include <graphics/RAKled.h>
@@ -297,27 +341,18 @@ ExternalNotificationModule::ExternalNotificationModule()
     // moduleConfig.external_notification.alert_message_buzzer = true;
 
     if (moduleConfig.external_notification.enabled) {
-        // startup the epd
-        display.begin();
-        display.clearBuffer();
-        #ifdef UPSIDE_DOWN
-        display.setRotation(1);
-        #else
-        display.setRotation(3);
-        #endif
-        display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);    
-        #ifdef UPSIDE_DOWN
-        display.setRotation(2);
-        #else
-        display.setRotation(0);
-        #endif
-        display.setFont(&FreeMonoBold12pt7b);
-        display.setTextColor(EPD_BLACK);
-        display.setCursor(115, 48);
-        display.print("MauiMesh");
-        display.display();
-        LOG_INFO("DID EPD");
 
+#ifdef NEOMATRIX 
+        m_matrix.begin();
+	    m_matrix.setTextWrap(false);
+
+    	set_brightness(8); // set real low during boot up to try to avoid brownouts
+
+        if (UPSIDE_DOWN) m_matrix.setRotation(2);
+
+        m_matrix.print("MauiMesh");
+        LOG_INFO("DID Bootup Splass");
+#endif
 
         if (!nodeDB.loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),
                               &meshtastic_RTTTLConfig_msg, &rtttlConfig)) {
@@ -438,6 +473,7 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
             if (moduleConfig.external_notification.alert_message) {
                 LOG_INFO("externalNotificationModule - Notification Module\n");
                 LOG_INFO("FromID : 0x%0x\n", mp.from);
+#ifdef NEOMATRIX
                 if (mp.from == 0xa3251978) {
                     LOG_INFO("DISPLAY_WIND");
                     displayWind(mp);
@@ -447,6 +483,7 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                     LOG_INFO("DISPLAY_TEXT");
                     displayText(mp);
                 }
+#endif
                 isNagging = true;
                 setExternalOn(0);
                 if (moduleConfig.external_notification.nag_timeout) {
@@ -558,7 +595,7 @@ void ExternalNotificationModule::handleSetRingtone(const char *from_msg)
 void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 {
 
-    display.clearBuffer();
+    m_matrix.clear();
     auto &p = mp.decoded;
     static char msg[70];
     sprintf(msg, "%s", p.payload.bytes);
@@ -602,114 +639,162 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         aux2[23] = '\0';  // Null-terminate the aux2 string
     }
 
-    // DISPLAY THE TIMESTAMP    
-    // Find the position of the 'T' character
-    const char* timeStart = strstr(msg, "T");
-    // Create a buffer to store the time
-    char timeBuffer[6];
-    if (timeStart != nullptr) {
-        // Move one position ahead to point to the start of the time (hour)
-        timeStart += 1;
 
-        // Create a buffer to store the time
-        char timeBuffer[6];
-
-        // Copy the time to the buffer
-        strncpy(timeBuffer, timeStart, 5);
-
-        // Null-terminate the buffer
-        timeBuffer[5] = '\0';
-    }
-
-   
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(180, 16);
-    display.setTextColor(EPD_BLACK);
-    display.print(timeBuffer);
-
-    // display.setFont(&FreeMonoBold12pt7b);
-    // display.setCursor(85, 16);
-    // display.setTextColor(EPD_BLACK);
-    // display.print(s);
+    if (avg <= 15) m_matrix.setTextColor(BLUE);
+    if (avg >= 15) m_matrix.setTextColor(CYAN);
+    if (avg >= 25) m_matrix.setTextColor(GREEN);
+    if (avg >= 30) m_matrix.setTextColor(MAGENTA);
+    if (avg >= 35) m_matrix.setTextColor(RED);
 
     // DISPLAY VELOCITY
-    display.setFont(&FreeMonoBold24pt7b);
-    display.setCursor(60, 60);
-    display.setTextColor(EPD_BLACK);
-    display.print(avg_g_gust);
-    display.setFont(&FreeMonoBold9pt7b);
+    m_matrix.print(avg_g_gust);
+    m_matrix.show()();
+    delay(2000)
   
     // DISPLAY DIR
-    display.setFont(&FreeMonoBold18pt7b);
-    display.setCursor(5, 30);
-    display.setTextColor(EPD_BLACK);
-    display.print(dir);
-    display.setCursor(5,60);
-    display.print(degree);  
+    m_matrix.print(dir);
+    m_matrix.print(degree);
+    m_matrix.show()();  
+    delay(2000);
 
     // DISPLAY AUX1
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(10, 90);
-    display.setTextColor(EPD_BLACK);
-    display.print(aux1); 
+    m_matrix.print(aux1); // needs animation
+    m_matrix.show()();
+    
+    char *m_dir_color = RED;    // default is red, most cases will be bad, we'll change them for when it's good.
+	uint8_t *m_dir = m_N;
+    if (strcmp(dir, "N") == 0) {
+		m_dir_color = CYAN;
+		m_dir = m_N;
+	}
+	else if (strcmp(dir, "NE") == 0) {
+		m_dir_color = GREEN;
+		//spl("dir is NE");
+		// now lets check for degrees
+		if (33 <= degree && degree <= 37) {
+			//spl("almost NNE");
+			m_dir =  m_NE1;
+		}
+		else if (38 <= degree && degree <= 42) {
+			//spl("more north");
+			m_dir =  m_NE2;
+		}
+		else if (43 <= degree && degree <= 47) {
+			//spl("perfect NE");
+			m_dir =  m_NE3;
+		}
+		else if (48 <= degree && degree <= 52) {
+			//spl("more east");
+			m_dir =  m_NE4;
+		}
+		else if (51 <= degree && degree <= 56) {
+			//spl("almost ENE");
+			m_dir =  m_NE5;
+		}
+		else {
+			m_dir =  m_NE3;
+			//spl("doing default");
 
-    //  DISPLAY AUX2
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(10, 117);
-    display.setTextColor(EPD_BLACK);
-    display.print(aux2);
+		}
+	}
+	else if (strcmp(dir, "NNE") == 0) {
+		m_dir_color = CYAN;
+		m_dir =  m_NNE;
+	}
+	else if (strcmp(dir, "NW") == 0) {
+		m_dir =  m_NW;
+	}
+	else if (strcmp(dir, "NNW") == 0) {
+		m_dir =  m_NNW;
+	}
+	else if (strcmp(dir, "ENE") == 0) {
+		m_dir_color = YELLOW;
+		m_dir =  m_ENE;
+	}
+	else if (strcmp(dir, "E") == 0) {
+		m_dir =  m_E;
+	}
+	else if (strcmp(dir, "ESE") == 0) {
+		m_dir =  m_ESE;
+	}
+	else if (strcmp(dir, "WSW") == 0) {
+		m_dir =  m_WSW;
+	}
+	else if (strcmp(dir, "S") == 0) {
+		m_dir =  m_S;
+	}
+	else if (strcmp(dir, "SE") == 0) {
+		m_dir =  m_SE;
+	}
+	else if (strcmp(dir, "SSE") == 0) {
+		m_dir =  m_SSE;
+	}
+	else if (strcmp(dir, "SW") == 0) {
+		m_dir =  m_SW;
+	}
+	else if (strcmp(dir, "SSW") == 0) {
+		m_dir =  m_SSW;
+	}
+	else if (strcmp(dir, "W") == 0) {
+		m_dir =  m_W;
+	}
+	else if (strcmp(dir, "WNW") == 0) {
+		m_dir =  m_WNW;
+	}
+	else {
+		m_dir_color = BLUE;
+		m_dir =  m_N;
+	}
 
-    // DISPLAY LABEL
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(84, 16);
-    display.setTextColor(EPD_BLACK);
-    display.print("Kanaha");
+    m_matrix.drawRect(3, 3, 2, 2, color);    // first draw center square it's always in the same place
+	m_matrix.drawRect(d[0], d[1], 2, 2, color);  // next draw the direcction square
+	if (!(d[2] == 0 && d[3] == 0)) {   // if we have non zero values for the extra pixel, then draw it
+		spl("doing extra dir pixel");
+		m_matrix.drawPixel(d[2], d[3], color);  // finally draw the pixel if we are in NE territory
+	}
+	// call show now or later ?
+	m_matrix.show();
 
-    display.display();
 
-// void show_data(String data)  {
-//   // parse the message as json
-//   if (last_message.equals(data)) return;
-//   StaticJsonDocument<512> doc;
-//   deserializeJson(doc, data.c_str());
-//   // json data looks like : {"avg": 7, "gust": 10, "lull": 4, "dir_card": "WSW", "dir_deg": 257, "stamp": "2023-10-21T20:37:44", "aux1": "2.6f,10s,N357", "aux2": "0907H2.2", "label": "Kanaha"}
-//   display.clearBuffer();
-//   String stamp = doc["stamp"];
-//   String hour = stamp.substring(stamp.indexOf('T')+1,stamp.indexOf(':'));
-//   String min = stamp.substring(stamp.indexOf(':')+1,stamp.indexOf(':')+3);
-//   String avg_g_gust = String(doc["avg"]) + "g" + String(doc["gust"]);
-//   display_location(String(doc["label"]));
-
-//   display_dir(doc["dir_card"],doc["dir_deg"]);
-//   display_vel(avg_g_gust);
-//   display_time(min.toInt(),hour.toInt());
-//   display_aux1(doc["aux1"]);
-//   display_aux2(doc["aux2"]);
-//   display.display();
-//   last_message = String(data);
-// }
 }
 void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
 {
 
-    display.clearBuffer();
     auto &p = mp.decoded;
     static char msg[256];
     sprintf(msg, "%s", p.payload.bytes);
     if (strcmp(msg, last_data) == 0 ) return; // don't re-display duplicate info
     strcpy(last_data, msg);
     
-    // parse the wind string
-    // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07
-    char data[70];  // Adjust the size according to your needs
 
-  
-    // DISPLAY Text
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(10, 20);
-    display.setTextColor(EPD_BLACK);
-    display.print(msg); 
+#ifdef NEOMATRIX
 
-    display.display();
+    m_matrix.clear();
+	int slength = len(msg);
+
+
+	if (slength < 8) {
+    	int cposx = M_WIDTH / 2 - width(s) / 2;
+		m_matrix.setCursor(cposx, 0);
+		m_matrix.print(msg);
+		m_matrix.show();
+	}
+	else {
+		m_matrix.setCursor(M_WIDTH, 0);
+		m_matrix.print(msg);
+		m_matrix.show();
+		// animate the scroll to the left
+		int x = M_WIDTH;
+		int pass = 0;
+		while (--x > -width(msg)) {
+			m_matrix.fillScreen(0);
+			m_matrix.setCursor(x, 0);
+			m_matrix.print(msg);
+			m_matrix.show();
+			delay(50);
+		}
+	}
+
+#endif
 
 }

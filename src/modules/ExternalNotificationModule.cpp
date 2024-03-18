@@ -23,27 +23,18 @@
 #include "main.h"
 #include "mesh/generated/meshtastic/rtttl.pb.h"
 #include <Arduino.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_NeoMatrix.h>
 
-#include "graphics/img/epd_img.h"
-#include "Adafruit_ThinkInk.h"
 #include <Fonts/FreeMonoBold24pt7b.h>
 #include <Fonts/FreeMonoBold18pt7b.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include <Fonts/FreeMonoBold9pt7b.h>
 
-// DEFINE THESE IN PIO.INI
-//#define EPD_CS   23  // purple
-//#define EPD_DC   33  // blue
-
-// MOSI : 27
-// CLK : 5
-// MISO : 19
-
-#ifdef OLD_EPD
-    Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
-#else
-    barfThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
-#endif
+Adafruit_NeoMatrix m_matrix = Adafruit_NeoMatrix(M_WIDTH, M_HEIGHT, DATA_PIN,
+		NEO_MATRIX_TOP + NEO_MATRIX_LEFT +
+		NEO_MATRIX_COLUMNS + NEO_MATRIX_ZIGZAG,
+		NEO_GRB + NEO_KHZ800);
 
 #ifdef HAS_NCP5623
 #include <graphics/RAKled.h>

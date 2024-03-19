@@ -77,6 +77,7 @@ uint8_t  m_SW [4] = {1,5,0,0}; //
 uint8_t  m_SSW[4] = {2,5,0,0}; // 
 uint8_t  m_W  [4] = {1,3,0,0}; // 
 uint8_t  m_WNW[4] = {1,2,0,0}; // 
+uint16_t  m_dir_color = RED;
 
 #endif
 
@@ -137,7 +138,7 @@ int32_t ExternalNotificationModule::runOnce()
             // let the song finish if we reach timeout
             nagCycleCutoff = UINT32_MAX;
             LOG_INFO("Turning off external notification: ");
-            for (int i = 0; i < 2; i++) {
+            for (int i = 0; i <= 2; i++) {
                 setExternalOff(i);
                 externalTurnedOn[i] = 0;
                 LOG_INFO("%d ", i);
@@ -203,6 +204,12 @@ int32_t ExternalNotificationModule::runOnce()
                 audioThread->beginRttl(rtttlConfig.ringtone, strlen_P(rtttlConfig.ringtone));
             }
         }
+#endif
+#ifdef NEOMATRIX
+        // animate the display matrix
+
+        // at the end set isAnimating to false
+        isAnimating = false;
 #endif
         // now let the PWM buzzer play
         if (moduleConfig.external_notification.use_pwm) {
@@ -346,8 +353,7 @@ ExternalNotificationModule::ExternalNotificationModule()
         m_matrix.begin();
 	    m_matrix.setTextWrap(false);
 
-    	set_brightness(8); // set real low during boot up to try to avoid brownouts
-
+	    m_matrix.setBrightness(8);
         if (UPSIDE_DOWN) m_matrix.setRotation(2);
 
         m_matrix.print("MauiMesh");
@@ -639,7 +645,6 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         aux2[23] = '\0';  // Null-terminate the aux2 string
     }
 
-
     if (avg <= 15) m_matrix.setTextColor(BLUE);
     if (avg >= 15) m_matrix.setTextColor(CYAN);
     if (avg >= 25) m_matrix.setTextColor(GREEN);
@@ -648,20 +653,19 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
     // DISPLAY VELOCITY
     m_matrix.print(avg_g_gust);
-    m_matrix.show()();
-    delay(2000)
+    m_matrix.show();
+    delay(2000);
   
     // DISPLAY DIR
     m_matrix.print(dir);
     m_matrix.print(degree);
-    m_matrix.show()();  
+    m_matrix.show();  
     delay(2000);
 
     // DISPLAY AUX1
     m_matrix.print(aux1); // needs animation
-    m_matrix.show()();
+    m_matrix.show();
     
-    char *m_dir_color = RED;    // default is red, most cases will be bad, we'll change them for when it's good.
 	uint8_t *m_dir = m_N;
     if (strcmp(dir, "N") == 0) {
 		m_dir_color = CYAN;
@@ -746,11 +750,10 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 		m_dir =  m_N;
 	}
 
-    m_matrix.drawRect(3, 3, 2, 2, color);    // first draw center square it's always in the same place
-	m_matrix.drawRect(d[0], d[1], 2, 2, color);  // next draw the direcction square
-	if (!(d[2] == 0 && d[3] == 0)) {   // if we have non zero values for the extra pixel, then draw it
-		spl("doing extra dir pixel");
-		m_matrix.drawPixel(d[2], d[3], color);  // finally draw the pixel if we are in NE territory
+    m_matrix.drawRect(3, 3, 2, 2, m_dir_color);    // first draw center square it's always in the same place
+	m_matrix.drawRect(m_dir[0], m_dir[1], 2, 2, m_dir_color);  // next draw the direcction square
+	if (!(m_dir[2] == 0 && m_dir[3] == 0)) {   // if we have non zero values for the extra pixel, then draw it
+		m_matrix.drawPixel(m_dir[2], m_dir[3], m_dir_color);  // finally draw the pixel if we are in NE territory
 	}
 	// call show now or later ?
 	m_matrix.show();
@@ -770,11 +773,13 @@ void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
 #ifdef NEOMATRIX
 
     m_matrix.clear();
-	int slength = len(msg);
+	int slength = strlen(msg);
 
-
+    uint16_t w, h;
+    int16_t x, y;
+    m_matrix.getTextBounds(msg, 0, 0, &x, &y, &w, &h);
 	if (slength < 8) {
-    	int cposx = M_WIDTH / 2 - width(s) / 2;
+    	int cposx = M_WIDTH / 2 - w / 2;
 		m_matrix.setCursor(cposx, 0);
 		m_matrix.print(msg);
 		m_matrix.show();
@@ -784,9 +789,8 @@ void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
 		m_matrix.print(msg);
 		m_matrix.show();
 		// animate the scroll to the left
-		int x = M_WIDTH;
 		int pass = 0;
-		while (--x > -width(msg)) {
+		while (--x > -w) {
 			m_matrix.fillScreen(0);
 			m_matrix.setCursor(x, 0);
 			m_matrix.print(msg);

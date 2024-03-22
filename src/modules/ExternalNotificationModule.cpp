@@ -33,13 +33,6 @@
 #define purple 0x604D
 #define green 0x1AE9
 
-// #include "graphics/img/epd_img.h"
-// #include "Adafruit_ThinkInk.h"
-// #include <Fonts/FreeMonoBold24pt7b.h>
-// #include <Fonts/FreeMonoBold18pt7b.h>
-// #include <Fonts/FreeMonoBold12pt7b.h>
-// #include <Fonts/FreeMonoBold9pt7b.h>
-
 TFT_eSPI m_lcd = TFT_eSPI(170, 320);
 TFT_eSprite m_sprite = TFT_eSprite(&m_lcd);
 
@@ -270,26 +263,26 @@ ExternalNotificationModule::ExternalNotificationModule()
     if (moduleConfig.external_notification.enabled) {
 
         // SPI.end();
-        // SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, 6);
         // SPI.begin();
+        // Wire.end();
         m_lcd.init();
+        m_lcd.setRotation(3);
         m_lcd.setSwapBytes(true);
 
-        // SPI.begin(EPD_SCK, EPD_MISO,EPD_MOSI,EPD_CS);
-
         LOG_INFO("DOING WINDYTRON_LOGO");
+        m_lcd.fillScreen(TFT_BLACK);
 
         if (!config.display.flip_screen) {
             m_lcd.setRotation(1);
         } else {
             m_lcd.setRotation(3);
         }
-        m_lcd.fillScreen(TFT_BLACK);
         m_lcd.pushImage(0, 0, 320, 170, tft_bitmap_windy_tron_320_color_gradient);
+
         if (!config.display.flip_screen) {
-            m_lcd.setRotation(2);
+            m_lcd.setRotation(1);
         } else {
-            m_lcd.setRotation(0);
+            m_lcd.setRotation(3);
         }
         m_lcd.setFreeFont(MEDIUM);
         m_lcd.setCursor(140, 60);
@@ -554,6 +547,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     char *dir = token;
     token = strtok(NULL, " ");
     int degree = atoi(token);
+    LOG_INFO("DEGREE IS", degree);
     token = strtok(NULL, "g");
     int avg = atoi(token);
     token = strtok(NULL, " ");
@@ -625,11 +619,11 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     m_lcd.print(gust);
 
     // display_dir(m_data->get("dir_card"),m_data->get("dir_deg"));
-    if (dir == "N")
+    if (strcmp(dir, "N") == 0)
         m_lcd.setTextColor(TFT_CYAN);
-    if (dir == "NE")
+    if (strcmp(dir, "NE") == 0)
         m_lcd.setTextColor(TFT_GREEN);
-    if (dir == "ENE")
+    if (strcmp(dir, "ENE") == 0)
         m_lcd.setTextColor(TFT_YELLOW);
     m_lcd.setFreeFont(MEDLAR);
     m_lcd.setTextSize(1);
@@ -637,7 +631,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     m_lcd.print(dir);
     m_lcd.setFreeFont(MEDLAR);
     m_lcd.setCursor(5, 100);
-    m_lcd.print(degree + "*"); // for now we'll use * for degree symbol
+    m_lcd.print(degree); // for now we'll use * for degree symbol
 
     // display_swell(m_data->get("aux1"));
     m_lcd.setTextColor(TFT_WHITE);

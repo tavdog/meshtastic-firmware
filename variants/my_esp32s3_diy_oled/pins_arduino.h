@@ -15,8 +15,8 @@
 #define digitalPinHasPWM(p) (p < 46)
 
 // The default Wire will be mapped to PMU and RTC
-static const uint8_t SDA = 18;
-static const uint8_t SCL = 17;
+static const uint8_t SDA = -1;
+static const uint8_t SCL = -1;
 
 static const uint8_t SS = 10;
 static const uint8_t MOSI = 11;

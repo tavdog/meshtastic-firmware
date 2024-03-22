@@ -8,7 +8,7 @@
 
 #define HAS_RADIO 0
 
-// #define USE_SSD1306
+#define USE_SSD1306
 
 #define I2C_SDA 18 // 1 // I2C pins for this board
 #define I2C_SCL 17 // 2

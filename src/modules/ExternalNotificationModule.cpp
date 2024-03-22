@@ -24,6 +24,7 @@
 #include "main.h"
 #include "mesh/generated/meshtastic/rtttl.pb.h"
 #include <Arduino.h>
+#include <Wire.h>
 #define SMALL &FreeSansBold9pt7b
 #define MEDIUM &FreeSansBold12pt7b
 #define MEDLAR &FreeSansBold18pt7b
@@ -42,7 +43,7 @@
 // #include <Fonts/FreeMonoBold9pt7b.h>
 
 TFT_eSPI m_lcd = TFT_eSPI(170, 320);
-TFT_eSprite m_sprite = TFT_eSprite(m_lcd);
+TFT_eSprite m_sprite = TFT_eSprite(&m_lcd);
 
 #ifndef PIN_BUZZER
 #define PIN_BUZZER false
@@ -273,10 +274,8 @@ ExternalNotificationModule::ExternalNotificationModule()
         m_lcd.init();
         m_lcd.setSwapBytes(true);
 
-        if (m_upsidedown) {
-            spl2("upside down set ", m_config->gets("upsidedown"));
-        }
         // SPI.end();
+        // SPI.begin();
         // SPI.begin(EPD_SCK, EPD_MISO,EPD_MOSI,EPD_CS);
 
         LOG_INFO("DOING WINDYTRON_LOGO");
@@ -295,7 +294,7 @@ ExternalNotificationModule::ExternalNotificationModule()
         }
         m_lcd.setFreeFont(MEDIUM);
         m_lcd.setCursor(140, 60);
-        m_lcd.print(small);
+        m_lcd.print("TronMesh");
 
         if (!nodeDB.loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),
                               &meshtastic_RTTTLConfig_msg, &rtttlConfig)) {
@@ -599,22 +598,24 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         timeBuffer[5] = '\0';
     }
 
+    m_lcd.fillScreen(TFT_BLACK);
+
     // display_time(m_data->geti("min"), m_data->geti("hour"));
-    m_lcd->setFreeFont(MEDIUM);
-    m_lcd->setCursor(250, 19);
-    m_lcd->print(timeBuffer);
+    m_lcd.setFreeFont(MEDIUM);
+    m_lcd.setCursor(250, 19);
+    m_lcd.print(timeBuffer);
 
     // display_vel(m_data->get("avg"),m_data->get("gust"));
     if (avg < 15)
-        m_lcd->setTextColor(TFT_BLUE);
+        m_lcd.setTextColor(TFT_BLUE);
     if (avg >= 15)
-        m_lcd->setTextColor(TFT_CYAN);
+        m_lcd.setTextColor(TFT_CYAN);
     if (avg >= 25)
-        m_lcd->setTextColor(TFT_GREEN);
+        m_lcd.setTextColor(TFT_GREEN);
     if (avg >= 30)
-        m_lcd->setTextColor(TFT_MAGENTA);
+        m_lcd.setTextColor(TFT_MAGENTA);
     if (avg >= 35)
-        m_lcd->setTextColor(TFT_RED);
+        m_lcd.setTextColor(TFT_RED);
     m_lcd.setCursor(120, 90);
     m_lcd.setFreeFont(MEDLAR);
     m_lcd.setTextSize(2);
@@ -625,19 +626,19 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     m_lcd.print(gust);
 
     // display_dir(m_data->get("dir_card"),m_data->get("dir_deg"));
-    if (card == "N")
+    if (dir == "N")
         m_lcd.setTextColor(TFT_CYAN);
-    if (card == "NE")
+    if (dir == "NE")
         m_lcd.setTextColor(TFT_GREEN);
-    if (card == "ENE")
+    if (dir == "ENE")
         m_lcd.setTextColor(TFT_YELLOW);
     m_lcd.setFreeFont(MEDLAR);
     m_lcd.setTextSize(1);
     m_lcd.setCursor(5, 58);
-    m_lcd.print(card);
+    m_lcd.print(dir);
     m_lcd.setFreeFont(MEDLAR);
     m_lcd.setCursor(5, 100);
-    m_lcd.print(deg + "*"); // for now we'll use * for degree symbol
+    m_lcd.print(degree + "*"); // for now we'll use * for degree symbol
 
     // display_swell(m_data->get("aux1"));
     m_lcd.setTextColor(TFT_WHITE);
@@ -656,7 +657,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
 {
 
-    display.clearBuffer();
+    // display.clearBuffer();
     auto &p = mp.decoded;
     static char msg[256];
     sprintf(msg, "%s", p.payload.bytes);
@@ -668,10 +669,15 @@ void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
     // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07
 
     // DISPLAY Text
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(10, 20);
-    display.setTextColor(EPD_BLACK);
-    display.print(msg);
+    m_lcd.setTextColor(TFT_CYAN);
+    m_lcd.setFreeFont(&FreeSans9pt7b);
+    m_lcd.setTextSize(1);
+    m_lcd.setCursor(10, 160);
+    m_lcd.print(msg);
+    // display.setFont(&FreeMonoBold12pt7b);
+    // display.setCursor(10, 20);
+    // display.setTextColor(EPD_BLACK);
+    // display.print(msg);
 
-    display.display();
+    // display.display();
 }

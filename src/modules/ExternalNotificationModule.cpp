@@ -23,8 +23,6 @@
 #include "main.h"
 #include "mesh/generated/meshtastic/rtttl.pb.h"
 #include <Arduino.h>
-#include <TFT_eSPI.h>
-#include <Wire.h>
 #define SMALL &FreeSansBold9pt7b
 #define MEDIUM &FreeSansBold12pt7b
 #define MEDLAR &FreeSansBold18pt7b
@@ -271,11 +269,12 @@ ExternalNotificationModule::ExternalNotificationModule()
 
     if (moduleConfig.external_notification.enabled) {
 
+        // SPI.end();
+        // SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, 6);
+        // SPI.begin();
         m_lcd.init();
         m_lcd.setSwapBytes(true);
 
-        // SPI.end();
-        // SPI.begin();
         // SPI.begin(EPD_SCK, EPD_MISO,EPD_MOSI,EPD_CS);
 
         LOG_INFO("DOING WINDYTRON_LOGO");

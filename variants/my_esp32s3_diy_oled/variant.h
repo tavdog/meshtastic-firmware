@@ -6,6 +6,8 @@
 // #define HAS_SDCARD
 // #define SDCARD_USE_SPI1
 
+#define HAS_RADIO 0
+
 #define USE_SSD1306
 
 #define I2C_SDA 18 // 1 // I2C pins for this board

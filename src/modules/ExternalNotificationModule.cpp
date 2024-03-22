@@ -18,38 +18,31 @@
 #include "NodeDB.h"
 #include "RTC.h"
 #include "Router.h"
+#include "TFT_eSPI.h"
 #include "buzz/buzz.h"
 #include "configuration.h"
 #include "main.h"
 #include "mesh/generated/meshtastic/rtttl.pb.h"
 #include <Arduino.h>
+#define SMALL &FreeSansBold9pt7b
+#define MEDIUM &FreeSansBold12pt7b
+#define MEDLAR &FreeSansBold18pt7b
+#define LARGE &FreeSansBold24pt7b
+#define gray 0x6B6D
+#define blue 0x0AAD
+#define orange 0xC260
+#define purple 0x604D
+#define green 0x1AE9
 
-#include "graphics/img/epd_img.h"
-#include "Adafruit_ThinkInk.h"
-#include <Fonts/FreeMonoBold24pt7b.h>
-#include <Fonts/FreeMonoBold18pt7b.h>
-#include <Fonts/FreeMonoBold12pt7b.h>
-#include <Fonts/FreeMonoBold9pt7b.h>
+// #include "graphics/img/epd_img.h"
+// #include "Adafruit_ThinkInk.h"
+// #include <Fonts/FreeMonoBold24pt7b.h>
+// #include <Fonts/FreeMonoBold18pt7b.h>
+// #include <Fonts/FreeMonoBold12pt7b.h>
+// #include <Fonts/FreeMonoBold9pt7b.h>
 
-
-
-#ifdef OLD_EPD
-Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
-#else  
-ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
-#endif
-
-#ifdef HAS_NCP5623
-#include <graphics/RAKled.h>
-
-uint8_t red = 0;
-uint8_t green = 0;
-uint8_t blue = 0;
-uint8_t colorState = 1;
-uint8_t brightnessIndex = 0;
-uint8_t brightnessValues[] = {0, 10, 20, 30, 50, 90, 160, 170}; // blue gets multiplied by 1.5
-bool ascending = true;
-#endif
+TFT_eSPI m_lcd = TFT_eSPI(170, 320);
+TFT_eSprite m_sprite = TFT_eSprite(m_lcd);
 
 #ifndef PIN_BUZZER
 #define PIN_BUZZER false
@@ -123,30 +116,6 @@ int32_t ExternalNotificationModule::runOnce()
                 millis()) {
                 getExternal(2) ? setExternalOff(2) : setExternalOn(2);
             }
-#ifdef HAS_NCP5623
-            if (rgb_found.type == ScanI2C::NCP5623) {
-                red = (colorState & 4) ? brightnessValues[brightnessIndex] : 0;          // Red enabled on colorState = 4,5,6,7
-                green = (colorState & 2) ? brightnessValues[brightnessIndex] : 0;        // Green enabled on colorState = 2,3,6,7
-                blue = (colorState & 1) ? (brightnessValues[brightnessIndex] * 1.5) : 0; // Blue enabled on colorState = 1,3,5,7
-                rgb.setColor(red, green, blue);
-
-                if (ascending) { // fade in
-                    brightnessIndex++;
-                    if (brightnessIndex == (sizeof(brightnessValues) - 1)) {
-                        ascending = false;
-                    }
-                } else {
-                    brightnessIndex--; // fade out
-                }
-                if (brightnessIndex == 0) {
-                    ascending = true;
-                    colorState++; // next color
-                    if (colorState > 7) {
-                        colorState = 1;
-                    }
-                }
-            }
-#endif
 
 #ifdef T_WATCH_S3
             drv.go();
@@ -301,33 +270,32 @@ ExternalNotificationModule::ExternalNotificationModule()
 
     if (moduleConfig.external_notification.enabled) {
 
-        SPI.end();
-        SPI.begin(EPD_SCK, EPD_MISO,EPD_MOSI,EPD_CS);
+        m_lcd.init();
+        m_lcd.setSwapBytes(true);
+
+        if (m_upsidedown) {
+            spl2("upside down set ", m_config->gets("upsidedown"));
+        }
+        // SPI.end();
+        // SPI.begin(EPD_SCK, EPD_MISO,EPD_MOSI,EPD_CS);
 
         LOG_INFO("DOING WINDYTRON_LOGO");
-        // startup the epd
-        display.begin();
-        display.clearBuffer();
 
         if (!config.display.flip_screen) {
-            display.setRotation(1);
+            m_lcd.setRotation(1);
         } else {
-            display.setRotation(3);
+            m_lcd.setRotation(3);
         }
-        display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);    
+        m_lcd.fillScreen(TFT_BLACK);
+        m_lcd.pushImage(0, 0, 320, 170, tft_bitmap_windy_tron_320_color_gradient);
         if (!config.display.flip_screen) {
-            display.setRotation(2);
+            m_lcd.setRotation(2);
         } else {
-            display.setRotation(0);
+            m_lcd.setRotation(0);
         }
-        
-        display.setFont(&FreeMonoBold12pt7b);
-        display.setTextColor(EPD_BLACK);
-        display.setCursor(115, 48);
-        display.print(devicestate.owner.long_name);
-        display.display();
-        LOG_INFO("DID EPD");
-
+        m_lcd.setFreeFont(MEDIUM);
+        m_lcd.setCursor(140, 60);
+        m_lcd.print(small);
 
         if (!nodeDB.loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),
                               &meshtastic_RTTTLConfig_msg, &rtttlConfig)) {
@@ -432,7 +400,7 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                         setExternalOn(2);
                     } else {
 #ifdef HAS_I2S
-                        audioThread->beginRttl(rtttlConfig.ringtone, strlen_P(rtttlConfig.ringtone));
+                        audioThread.beginRttl(rtttlConfig.ringtone, strlen_P(rtttlConfig.ringtone));
 #else
                         rtttl::begin(config.device.buzzer_gpio, rtttlConfig.ringtone);
 #endif
@@ -569,16 +537,16 @@ void ExternalNotificationModule::handleSetRingtone(const char *from_msg)
 void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 {
 
-    display.clearBuffer();
     auto &p = mp.decoded;
     static char msg[70];
     sprintf(msg, "%s", p.payload.bytes);
-    if (strcmp(msg, last_data) == 0 ) return; // don't re-display duplicate info
+    if (strcmp(msg, last_data) == 0)
+        return; // don't re-display duplicate info
     strcpy(last_data, msg);
-    
+
     // parse the wind string
     // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07
-    char data[70];  // Adjust the size according to your needs
+    char data[70]; // Adjust the size according to your needs
 
     // Copy the content of msg to data
     strcpy(data, msg);
@@ -593,29 +561,28 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     token = strtok(NULL, " ");
     int gust = atoi(token);
 
-    char avg_g_gust[10];  // Adjust the size according to your needs
+    char avg_g_gust[10]; // Adjust the size according to your needs
     sprintf(avg_g_gust, " %dg%d ", avg, gust);
 
-    token = strtok(NULL, " ");  // throwaway the comma surrounded by spaces
+    token = strtok(NULL, " "); // throwaway the comma surrounded by spaces
     // Continue tokenization for AUX1 and AUX2
     token = strtok(NULL, "_");
-    char aux1[24] = "-";  // Assuming aux1 can be a maximum of 23 characters
+    char aux1[24] = "-"; // Assuming aux1 can be a maximum of 23 characters
     if (token != nullptr) {
         strncpy(aux1, token, 23);
-        aux1[23] = '\0';  // Null-terminate the aux1 string
-    }
-    
-    // Tokenize again to get AUX2
-    token = strtok(NULL, " -");
-    char aux2[24] = "-";  // Assuming aux2 can be a maximum of 23 characters
-    if (token != nullptr) {
-        strncpy(aux2, token, 23);
-        aux2[23] = '\0';  // Null-terminate the aux2 string
+        aux1[23] = '\0'; // Null-terminate the aux1 string
     }
 
-    // DISPLAY THE TIMESTAMP    
+    // Tokenize again to get AUX2
+    token = strtok(NULL, " -");
+    char aux2[24] = "-"; // Assuming aux2 can be a maximum of 23 characters
+    if (token != nullptr) {
+        strncpy(aux2, token, 23);
+        aux2[23] = '\0'; // Null-terminate the aux2 string
+    }
+
     // Find the position of the 'T' character
-    const char* timeStart = strstr(msg, "T");
+    const char *timeStart = strstr(msg, "T");
     // Create a buffer to store the time
     char timeBuffer[6];
     if (timeStart != nullptr) {
@@ -632,73 +599,59 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         timeBuffer[5] = '\0';
     }
 
-   
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(180, 16);
-    display.setTextColor(EPD_BLACK);
-    display.print(timeBuffer);
+    // display_time(m_data->geti("min"), m_data->geti("hour"));
+    m_lcd->setFreeFont(MEDIUM);
+    m_lcd->setCursor(250, 19);
+    m_lcd->print(timeBuffer);
 
-    // display.setFont(&FreeMonoBold12pt7b);
-    // display.setCursor(85, 16);
-    // display.setTextColor(EPD_BLACK);
-    // display.print(s);
+    // display_vel(m_data->get("avg"),m_data->get("gust"));
+    if (avg < 15)
+        m_lcd->setTextColor(TFT_BLUE);
+    if (avg >= 15)
+        m_lcd->setTextColor(TFT_CYAN);
+    if (avg >= 25)
+        m_lcd->setTextColor(TFT_GREEN);
+    if (avg >= 30)
+        m_lcd->setTextColor(TFT_MAGENTA);
+    if (avg >= 35)
+        m_lcd->setTextColor(TFT_RED);
+    m_lcd.setCursor(120, 90);
+    m_lcd.setFreeFont(MEDLAR);
+    m_lcd.setTextSize(2);
+    m_lcd.print(avg);
+    m_lcd.setFreeFont(&FreeSans12pt7b);
+    m_lcd.print('g');
+    m_lcd.setFreeFont(MEDLAR);
+    m_lcd.print(gust);
 
-    // DISPLAY VELOCITY
-    display.setFont(&FreeMonoBold24pt7b);
-    display.setCursor(60, 60);
-    display.setTextColor(EPD_BLACK);
-    display.print(avg_g_gust);
-    display.setFont(&FreeMonoBold9pt7b);
-  
-    // DISPLAY DIR
-    display.setFont(&FreeMonoBold18pt7b);
-    display.setCursor(5, 30);
-    display.setTextColor(EPD_BLACK);
-    display.print(dir);
-    display.setCursor(5,60);
-    display.print(degree);  
+    // display_dir(m_data->get("dir_card"),m_data->get("dir_deg"));
+    if (card == "N")
+        m_lcd.setTextColor(TFT_CYAN);
+    if (card == "NE")
+        m_lcd.setTextColor(TFT_GREEN);
+    if (card == "ENE")
+        m_lcd.setTextColor(TFT_YELLOW);
+    m_lcd.setFreeFont(MEDLAR);
+    m_lcd.setTextSize(1);
+    m_lcd.setCursor(5, 58);
+    m_lcd.print(card);
+    m_lcd.setFreeFont(MEDLAR);
+    m_lcd.setCursor(5, 100);
+    m_lcd.print(deg + "*"); // for now we'll use * for degree symbol
 
-    // DISPLAY AUX1
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(10, 90);
-    display.setTextColor(EPD_BLACK);
-    display.print(aux1); 
+    // display_swell(m_data->get("aux1"));
+    m_lcd.setTextColor(TFT_WHITE);
+    m_lcd.setFreeFont(&FreeSans9pt7b);
+    m_lcd.setTextSize(1);
+    m_lcd.setCursor(10, 135);
+    m_lcd.print(aux1);
 
-    //  DISPLAY AUX2
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(10, 117);
-    display.setTextColor(EPD_BLACK);
-    display.print(aux2);
-
-    // DISPLAY LABEL
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(84, 16);
-    display.setTextColor(EPD_BLACK);
-    display.print("Kanaha");
-
-    display.display();
-
-// void show_data(String data)  {
-//   // parse the message as json
-//   if (last_message.equals(data)) return;
-//   StaticJsonDocument<512> doc;
-//   deserializeJson(doc, data.c_str());
-//   // json data looks like : {"avg": 7, "gust": 10, "lull": 4, "dir_card": "WSW", "dir_deg": 257, "stamp": "2023-10-21T20:37:44", "aux1": "2.6f,10s,N357", "aux2": "0907H2.2", "label": "Kanaha"}
-//   display.clearBuffer();
-//   String stamp = doc["stamp"];
-//   String hour = stamp.substring(stamp.indexOf('T')+1,stamp.indexOf(':'));
-//   String min = stamp.substring(stamp.indexOf(':')+1,stamp.indexOf(':')+3);
-//   String avg_g_gust = String(doc["avg"]) + "g" + String(doc["gust"]);
-//   display_location(String(doc["label"]));
-
-//   display_dir(doc["dir_card"],doc["dir_deg"]);
-//   display_vel(avg_g_gust);
-//   display_time(min.toInt(),hour.toInt());
-//   display_aux1(doc["aux1"]);
-//   display_aux2(doc["aux2"]);
-//   display.display();
-//   last_message = String(data);
-// }
+    // display_swell2(m_data->get("aux2"));
+    m_lcd.setTextColor(TFT_CYAN);
+    m_lcd.setFreeFont(&FreeSans9pt7b);
+    m_lcd.setTextSize(1);
+    m_lcd.setCursor(10, 160);
+    m_lcd.print(aux2);
 }
 void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
 {
@@ -707,18 +660,18 @@ void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
     auto &p = mp.decoded;
     static char msg[256];
     sprintf(msg, "%s", p.payload.bytes);
-    if (strcmp(msg, last_data) == 0 ) return; // don't re-display duplicate info
+    if (strcmp(msg, last_data) == 0)
+        return; // don't re-display duplicate info
     strcpy(last_data, msg);
-    
+
     // parse the wind string
     // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07
-  
+
     // DISPLAY Text
     display.setFont(&FreeMonoBold12pt7b);
     display.setCursor(10, 20);
     display.setTextColor(EPD_BLACK);
-    display.print(msg); 
+    display.print(msg);
 
     display.display();
-
 }

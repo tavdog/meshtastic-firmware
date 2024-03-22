@@ -18,12 +18,12 @@
 #include "NodeDB.h"
 #include "RTC.h"
 #include "Router.h"
-#include "TFT_eSPI.h"
 #include "buzz/buzz.h"
 #include "configuration.h"
 #include "main.h"
 #include "mesh/generated/meshtastic/rtttl.pb.h"
 #include <Arduino.h>
+#include <TFT_eSPI.h>
 #include <Wire.h>
 #define SMALL &FreeSansBold9pt7b
 #define MEDIUM &FreeSansBold12pt7b

@@ -31,7 +31,7 @@
 #define HAS_SENSOR 1
 #endif
 #ifndef HAS_RADIO
-#define HAS_RADIO 1
+#define HAS_RADIO 0
 #endif
 #ifndef HAS_RTC
 #define HAS_RTC 1

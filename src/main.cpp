@@ -74,7 +74,7 @@ NRF52Bluetooth *nrf52Bluetooth;
 #include "STM32WLE5JCInterface.h"
 #endif
 
-#if !HAS_RADIO && defined(ARCH_PORTDUINO)
+#if !HAS_RADIO //&& defined(ARCH_PORTDUINO)
 #include "platform/portduino/SimRadio.h"
 #endif
 
@@ -777,7 +777,8 @@ void setup()
     }
 #endif
 
-#if !HAS_RADIO && defined(ARCH_PORTDUINO)
+#if !HAS_RADIO //&& defined(ARCH_PORTDUINO)
+#include "platform/portduino/SimRadio.h"
     if (!rIf) {
         rIf = new SimRadio;
         if (!rIf->init()) {

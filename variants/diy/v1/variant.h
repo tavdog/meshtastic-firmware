@@ -2,6 +2,7 @@
 #define I2C_SDA 21
 #define I2C_SCL 22
 
+#define HAS_RADIO 0
 // GPS
 #undef GPS_RX_PIN
 #undef GPS_TX_PIN

@@ -1,3 +1,14 @@
+// #define OLD_EPD
+// #define UPSIDE_DOWN not used, using config.display.flip_screen
+#define EPD_SCK 18
+#define EPD_MISO 19
+#define EPD_MOSI 2
+#define EPD_CS 5
+#define EPD_DC 0
+
+#define HAS_GPS 0
+#define HAS_RADIO 0
+
 // For OLED LCD
 #define I2C_SDA 21
 #define I2C_SCL 22
@@ -6,12 +17,7 @@
 // GPS
 #undef GPS_RX_PIN
 #undef GPS_TX_PIN
-#define GPS_RX_PIN 12
-#define GPS_TX_PIN 15
-#define GPS_UBLOX
 
-#define BUTTON_PIN 39  // The middle button GPIO on the T-Beam
-#define BATTERY_PIN 35 // A battery voltage measurement pin, voltage divider connected here to measure battery voltage
 #define ADC_CHANNEL ADC1_GPIO35_CHANNEL
 #define ADC_MULTIPLIER 1.85 // (R1 = 470k, R2 = 680k)
 #define EXT_PWR_DETECT 4    // Pin to detect connected external power source for LILYGO® TTGO T-Energy T18 and other DIY boards

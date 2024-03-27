@@ -27,7 +27,7 @@
 #undef LORA_MISO
 #define LORA_MISO 19
 #undef LORA_MOSI
-#define LORA_MOSI 23
+#define LORA_MOSI 2
 #undef LORA_CS
 #define LORA_CS 5
 

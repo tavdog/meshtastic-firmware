@@ -75,9 +75,8 @@ NRF52Bluetooth *nrf52Bluetooth;
 #endif
 
 #if !HAS_RADIO //&& defined(ARCH_PORTDUINO)
-// #if !HAS_RADIO
 #include "platform/portduino/SimRadio.h"
-// #endif
+#endif
 
 #ifdef ARCH_PORTDUINO
 #include "linux/LinuxHardwareI2C.h"
@@ -778,7 +777,7 @@ void setup()
     }
 #endif
 
-#if !HAS_RADIO && defined(ARCH_PORTDUINO)
+#if !HAS_RADIO // && defined(ARCH_PORTDUINO)
     if (!rIf) {
         rIf = new SimRadio;
         if (!rIf->init()) {

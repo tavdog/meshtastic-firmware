@@ -168,7 +168,8 @@ NodeNum MeshService::getNodenumFromRequestId(uint32_t request_id)
  */
 void MeshService::handleToRadio(meshtastic_MeshPacket &p)
 {
-#if !HAS_RADIO
+
+#if (!HAS_RADIO && defined(ARCH_PORTDUINO)) || defined(SIMULATE_LORA)
     // Simulates device is receiving a packet via the LoRa chip
     if (p.decoded.portnum == meshtastic_PortNum_SIMULATOR_APP) {
         // Simulator packet (=Compressed packet) is encapsulated in a MeshPacket, so need to unwrap first

@@ -1,5 +1,7 @@
 // #define OLD_EPD
 // #define UPSIDE_DOWN not used, using config.display.flip_screen
+// #define HAS_RADIO 0 // not needed
+#define SIMULATE_LORA 1
 #define EPD_SCK 18
 #define EPD_MISO 19
 #define EPD_MOSI 2
@@ -7,13 +9,11 @@
 #define EPD_DC 0
 
 #define HAS_GPS 0
-#define HAS_RADIO 0
 
 // For OLED LCD
 #define I2C_SDA 21
 #define I2C_SCL 22
 
-#define HAS_RADIO 0
 // GPS
 #undef GPS_RX_PIN
 #undef GPS_TX_PIN

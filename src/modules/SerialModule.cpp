@@ -176,6 +176,8 @@ int32_t SerialModule::runOnce()
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO) {
                 emitRebooted();
             }
+
+            // if not first time
         } else {
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO) {
                 return runOncePart();
@@ -199,7 +201,21 @@ int32_t SerialModule::runOnce()
                 }
             }
 #if !defined(TTGO_T_ECHO) && !defined(CANARYONE)
-            else {
+            else if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_WX) {
+                // we are expecting weather data over serial.  We probably will just be calculating an average an updating
+                // gust data.  check millis and interval to see if we should send over mesh
+                if (Serial2.available()) {
+                    serialPayloadSize = Serial2.readBytes(
+                        serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN); // parse them bytes and get the weather data.
+                    String wind = "NE 45 25g30"; // weather data might already have a calculated averge
+                    // average over that last 5 minutes if not
+                }
+                if (millis() - lastNmeaTime > 300000) { // 5 minutes
+                    lastNmeaTime = millis();
+                    serialModuleRadio->sendPayload();
+                }
+
+            } else {
                 while (Serial2.available()) {
                     serialPayloadSize = Serial2.readBytes(serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN);
                     serialModuleRadio->sendPayload();

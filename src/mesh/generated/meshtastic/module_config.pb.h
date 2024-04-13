@@ -60,7 +60,9 @@ typedef enum _meshtastic_ModuleConfig_SerialConfig_Serial_Mode {
     meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG = 3,
     meshtastic_ModuleConfig_SerialConfig_Serial_Mode_NMEA = 4,
     /* NMEA messages specifically tailored for CalTopo */
-    meshtastic_ModuleConfig_SerialConfig_Serial_Mode_CALTOPO = 5
+    meshtastic_ModuleConfig_SerialConfig_Serial_Mode_CALTOPO = 5,
+    /* Weather data eg. wind:NE 45 152530 */
+    meshtastic_ModuleConfig_SerialConfig_Serial_Mode_WX = 6
 } meshtastic_ModuleConfig_SerialConfig_Serial_Mode;
 
 /* TODO: REPLACE */

@@ -106,13 +106,13 @@ int32_t SerialModule::runOnce()
         Uncomment the preferences below if you want to use the module
         without having to configure it from the PythonAPI or WebUI.
     */
-
-    // moduleConfig.serial.enabled = true;
-    // moduleConfig.serial.rxd = 35;
-    // moduleConfig.serial.txd = 15;
+    // hardcoded for rak4631 (nrf52)
+    moduleConfig.serial.enabled = true;
+    moduleConfig.serial.rxd = 15;
+    moduleConfig.serial.txd = 16;
     // moduleConfig.serial.override_console_serial_port = true;
-    // moduleConfig.serial.mode = meshtastic_ModuleConfig_SerialConfig_Serial_Mode_CALTOPO;
-    // moduleConfig.serial.timeout = 1000;
+    moduleConfig.serial.mode = meshtastic_ModuleConfig_SerialConfig_Serial_Mode_WX;
+    moduleConfig.serial.timeout = 1000;
     // moduleConfig.serial.echo = 1;
 
     if (!moduleConfig.serial.enabled)
@@ -207,10 +207,11 @@ int32_t SerialModule::runOnce()
                 if (Serial2.available()) {
                     serialPayloadSize = Serial2.readBytes(
                         serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN); // parse them bytes and get the weather data.
-                    String wind = "NE 45 25g30"; // weather data might already have a calculated averge
+                    String wind = "NE 45 25g30"; // weather data might already have a calculated average
+                    // probably want to calculate a rolling 1 minute or 5 minute average ?
                     // average over that last 5 minutes if not
                 }
-                if (millis() - lastNmeaTime > 300000) { // 5 minutes
+                if (millis() - lastNmeaTime > 300000) { // 5 minutes or 1 minute ?
                     lastNmeaTime = millis();
                     serialModuleRadio->sendPayload();
                 }

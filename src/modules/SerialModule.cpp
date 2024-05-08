@@ -201,10 +201,11 @@ int32_t SerialModule::runOnce()
 #if !defined(TTGO_T_ECHO) && !defined(CANARYONE)
 
             else if (moduleConfig.serial.mode ==
-                     meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) { // using this for WS80 for now
-                static String windDir = "xxx";
-                static String windVel = "xx.x";
-                static String windGust = "xx.x";
+                     meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) // using this for WS80 for now
+            {
+                static char windDir[4] = "xxx";   // Assuming windDir is 3 characters long + null terminator
+                static char windVel[5] = "xx.x";  // Assuming windVel is 4 characters long + null terminator
+                static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator
                 char formattedString[16];
                 while (Serial.available()) {
                     // clear serialBytes buffer
@@ -217,42 +218,43 @@ int32_t SerialModule::runOnce()
                     // 19 : 21 : 37.325->WindSpeed = 0.0
                     // 19 : 21 : 37.325->WindGust = 0.5
                     if (serialPayloadSize > 0) {
-                        // Convert serialBytes to a String for easier manipulation
-                        String serialData = String(serialBytes);
-                        // Serial.print(serialData);
-
                         // Define variables for line processing
                         int lineStart = 0;
-                        int lineEnd = serialData.indexOf('\n');
+                        int lineEnd = -1;
 
-                        // Process each line
-                        while (lineEnd != -1) {
-                            // Extract the current line
-                            String line = serialData.substring(lineStart, lineEnd);
-                            Serial.println(line);
-                            if (line.indexOf("Wind") > -1) // we have a wind line
-                            {
-                                // Find the positions of "=" signs in the line
-                                int windDirPos = line.indexOf("WindDir      = ");
-                                int windSpeedPos = line.indexOf("WindSpeed    = ");
-                                int windGustPos = line.indexOf("WindGust     = ");
+                        // Process each byte in the received data
+                        for (int i = 0; i < serialPayloadSize; i++) {
+                            if (serialBytes[i] == '\n') {
+                                lineEnd = i;
+                                // Extract the current line
+                                char line[meshtastic_Constants_DATA_PAYLOAD_LEN];
+                                memset(line, '\0', sizeof(line));
+                                memcpy(line, &serialBytes[lineStart], lineEnd - lineStart);
+                                Serial.println(line);
 
-                                if (windDirPos > -1) {
-                                    // Extract data after "=" for WindDir
-                                    windDir = line.substring(windDirPos + 15); // Add 10 to skip "WindDir = "
-                                } else if (windSpeedPos > -1) {
-                                    // Extract data after "=" for WindSpeed
-                                    windVel = line.substring(windSpeedPos + 15); // Add 12 to skip "WindSpeed = "
-                                } else if (windGustPos > -1) {
-                                    windGust = line.substring(windGustPos + 15); // Add 12 to skip "WindSpeed = "
+                                if (strstr(line, "Wind") != NULL) // we have a wind line
+                                {
+                                    // Find the positions of "=" signs in the line
+                                    char *windDirPos = strstr(line, "WindDir      = ");
+                                    char *windSpeedPos = strstr(line, "WindSpeed    = ");
+                                    char *windGustPos = strstr(line, "WindGust     = ");
+
+                                    if (windDirPos != NULL) {
+                                        // Extract data after "=" for WindDir
+                                        strcpy(windDir, windDirPos + 15); // Add 10 to skip "WindDir = "
+                                    } else if (windSpeedPos != NULL) {
+                                        // Extract data after "=" for WindSpeed
+                                        strcpy(windVel, windSpeedPos + 15); // Add 12 to skip "WindSpeed = "
+                                    } else if (windGustPos != NULL) {
+                                        strcpy(windGust, windGustPos + 15); // Add 12 to skip "WindSpeed = "
+                                    }
                                 }
-                            }
 
-                            // Update lineStart and lineEnd for the next line
-                            lineStart = lineEnd + 1;
-                            lineEnd = serialData.indexOf('\n', lineStart);
+                                // Update lineStart for the next line
+                                lineStart = lineEnd + 1;
+                            }
                         }
-                        Serial.printf("Wind : %s %sg%s", windDir.c_str(), windVel.c_str(), windGust.c_str());
+                        Serial.printf("Wind : %s %sg%s", windDir, windVel, windGust);
                         // Serial.println(formattedString);
                     }
                 }

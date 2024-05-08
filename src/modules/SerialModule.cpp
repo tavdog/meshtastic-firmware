@@ -49,7 +49,7 @@
 
 #define RX_BUFFER 256
 #define TIMEOUT 250
-#define BAUD 38400
+#define BAUD 115200
 #define ACK 1
 
 // API: Defaulting to the formerly removed phone_timeout_secs value of 15 minutes
@@ -107,7 +107,7 @@ int32_t SerialModule::runOnce()
         without having to configure it from the PythonAPI or WebUI.
     */
 
-    // moduleConfig.serial.enabled = true;
+    moduleConfig.serial.enabled = true;
     // moduleConfig.serial.rxd = 35;
     // moduleConfig.serial.txd = 15;
     // moduleConfig.serial.override_console_serial_port = true;
@@ -176,7 +176,7 @@ int32_t SerialModule::runOnce()
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO) {
                 emitRebooted();
             }
-        } else {
+        } else { // not first time
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO) {
                 return runOncePart();
             } else if ((moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_NMEA) && HAS_GPS) {
@@ -199,7 +199,66 @@ int32_t SerialModule::runOnce()
                 }
             }
 #if !defined(TTGO_T_ECHO) && !defined(CANARYONE)
-            else {
+
+            else if (moduleConfig.serial.mode ==
+                     meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) { // using this for WS80 for now
+                static String windDir = "xxx";
+                static String windVel = "xx.x";
+                static String windGust = "xx.x";
+                char formattedString[16];
+                while (Serial.available()) {
+                    // clear serialBytes buffer
+                    memset(serialBytes, '\0', sizeof(serialBytes));
+                    memset(formattedString, '\0', sizeof(formattedString));
+                    serialPayloadSize = Serial.readBytes(serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN);
+                    Serial.printf("Serial Size : %i\n", serialPayloadSize);
+                    // check for a string we care about
+                    // WindDir = 173
+                    // 19 : 21 : 37.325->WindSpeed = 0.0
+                    // 19 : 21 : 37.325->WindGust = 0.5
+                    if (serialPayloadSize > 0) {
+                        // Convert serialBytes to a String for easier manipulation
+                        String serialData = String(serialBytes);
+                        // Serial.print(serialData);
+
+                        // Define variables for line processing
+                        int lineStart = 0;
+                        int lineEnd = serialData.indexOf('\n');
+
+                        // Process each line
+                        while (lineEnd != -1) {
+                            // Extract the current line
+                            String line = serialData.substring(lineStart, lineEnd);
+                            Serial.println(line);
+                            if (line.indexOf("Wind") > -1) // we have a wind line
+                            {
+                                // Find the positions of "=" signs in the line
+                                int windDirPos = line.indexOf("WindDir      = ");
+                                int windSpeedPos = line.indexOf("WindSpeed    = ");
+                                int windGustPos = line.indexOf("WindGust     = ");
+
+                                if (windDirPos > -1) {
+                                    // Extract data after "=" for WindDir
+                                    windDir = line.substring(windDirPos + 15); // Add 10 to skip "WindDir = "
+                                } else if (windSpeedPos > -1) {
+                                    // Extract data after "=" for WindSpeed
+                                    windVel = line.substring(windSpeedPos + 15); // Add 12 to skip "WindSpeed = "
+                                } else if (windGustPos > -1) {
+                                    windGust = line.substring(windGustPos + 15); // Add 12 to skip "WindSpeed = "
+                                }
+                            }
+
+                            // Update lineStart and lineEnd for the next line
+                            lineStart = lineEnd + 1;
+                            lineEnd = serialData.indexOf('\n', lineStart);
+                        }
+                        Serial.printf("Wind : %s %sg%s", windDir.c_str(), windVel.c_str(), windGust.c_str());
+                        // Serial.println(formattedString);
+                    }
+                }
+                strcpy(serialBytes, formattedString);
+                // serialModuleRadio->sendPayload();
+            } else { // if Serial_Mode == Default or Simple
                 while (Serial2.available()) {
                     serialPayloadSize = Serial2.readBytes(serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN);
                     serialModuleRadio->sendPayload();

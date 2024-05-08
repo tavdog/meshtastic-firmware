@@ -2,11 +2,20 @@
 // #define UPSIDE_DOWN not used, using config.display.flip_screen
 // #define HAS_RADIO 0 // not needed
 #define SIMULATE_LORA 1
+#ifdef featheresp32
+#define EPD_SCK 5
+#define EPD_MISO 19
+#define EPD_MOSI 18
+#define EPD_CS 15
+#define EPD_DC 33
+
+#else
 #define EPD_SCK 18
 #define EPD_MISO 19
 #define EPD_MOSI 2
 #define EPD_CS 5
 #define EPD_DC 0
+#endif
 
 #define HAS_GPS 0
 

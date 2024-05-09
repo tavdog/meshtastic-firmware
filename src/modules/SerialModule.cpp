@@ -147,6 +147,7 @@ int32_t SerialModule::runOnce()
             }
 #elif !defined(TTGO_T_ECHO) && !defined(CANARYONE)
             if (moduleConfig.serial.rxd && moduleConfig.serial.txd) {
+                LOG_INFO("SETTING SERIAL2 PINS");
 #ifdef ARCH_RP2040
                 Serial2.setFIFOSize(RX_BUFFER);
                 Serial2.setPinout(moduleConfig.serial.txd, moduleConfig.serial.rxd);
@@ -203,6 +204,7 @@ int32_t SerialModule::runOnce()
             else if (moduleConfig.serial.mode ==
                      meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) // using this for WS80 for now
             {
+                Serial.print("runonce");
                 static char windDir[4] = "xxx";   // Assuming windDir is 3 characters long + null terminator
                 static char windVel[5] = "xx.x";  // Assuming windVel is 4 characters long + null terminator
                 static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator

@@ -50,6 +50,7 @@
 #define RX_BUFFER 256
 #define TIMEOUT 250
 #define BAUD 115200
+#define BAUD 115200
 #define ACK 1
 
 // API: Defaulting to the formerly removed phone_timeout_secs value of 15 minutes
@@ -157,6 +158,7 @@ int32_t SerialModule::runOnce()
 #elif !defined(TTGO_T_ECHO) && !defined(CANARYONE)
             if (moduleConfig.serial.rxd && moduleConfig.serial.txd) {
                 LOG_INFO("SETTING SERIAL2 PINS");
+                LOG_INFO("SETTING SERIAL2 PINS");
 #ifdef ARCH_RP2040
                 Serial2.setFIFOSize(RX_BUFFER);
                 Serial2.setPinout(moduleConfig.serial.txd, moduleConfig.serial.rxd);
@@ -186,6 +188,7 @@ int32_t SerialModule::runOnce()
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO) {
                 emitRebooted();
             }
+        } else { // not first time
         } else { // not first time
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO) {
                 return runOncePart();

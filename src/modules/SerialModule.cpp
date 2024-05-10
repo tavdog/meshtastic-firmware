@@ -69,6 +69,13 @@ static Print *serialPrint = &Serial2;
 char serialBytes[meshtastic_Constants_DATA_PAYLOAD_LEN];
 size_t serialPayloadSize;
 
+int dirSum = 0;
+int velSum = 0;
+int gust = 0;
+int velCount = 0;
+int dirCount = 0;
+unsigned int lastAveraged = millis();
+const int averageIntervalMillis = 300000; // 5 minutes
 SerialModuleRadio::SerialModuleRadio() : MeshModule("SerialModuleRadio")
 {
     switch (moduleConfig.serial.mode) {
@@ -204,17 +211,12 @@ int32_t SerialModule::runOnce()
             else if (moduleConfig.serial.mode ==
                      meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) // using this for WS80 for now
             {
-                Serial.print("runonce");
-                static char windDir[4] = "xxx";   // Assuming windDir is 3 characters long + null terminator
-                static char windVel[5] = "xx.x";  // Assuming windVel is 4 characters long + null terminator
-                static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator
-                char formattedString[16];
-                while (Serial.available()) {
+                bool gotwind = false;
+                while (Serial2.available()) {
                     // clear serialBytes buffer
                     memset(serialBytes, '\0', sizeof(serialBytes));
                     memset(formattedString, '\0', sizeof(formattedString));
-                    serialPayloadSize = Serial.readBytes(serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN);
-                    Serial.printf("Serial Size : %i\n", serialPayloadSize);
+                    serialPayloadSize = Serial2.readBytes(serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN);
                     // check for a string we care about
                     // WindDir = 173
                     // 19 : 21 : 37.325->WindSpeed = 0.0
@@ -232,10 +234,15 @@ int32_t SerialModule::runOnce()
                                 char line[meshtastic_Constants_DATA_PAYLOAD_LEN];
                                 memset(line, '\0', sizeof(line));
                                 memcpy(line, &serialBytes[lineStart], lineEnd - lineStart);
-                                Serial.println(line);
 
                                 if (strstr(line, "Wind") != NULL) // we have a wind line
                                 {
+                                    static char windDir[4] = "xxx";   // Assuming windDir is 3 characters long + null terminator
+                                    static char windVel[5] = "xx.x";  // Assuming windVel is 4 characters long + null terminator
+                                    static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator
+                                    char formattedString[16];
+
+                                    gotwind = true;
                                     // Find the positions of "=" signs in the line
                                     char *windDirPos = strstr(line, "WindDir      = ");
                                     char *windSpeedPos = strstr(line, "WindSpeed    = ");
@@ -244,11 +251,16 @@ int32_t SerialModule::runOnce()
                                     if (windDirPos != NULL) {
                                         // Extract data after "=" for WindDir
                                         strcpy(windDir, windDirPos + 15); // Add 10 to skip "WindDir = "
+                                        dirSum += int(windDir);
+                                        dirCount++;
                                     } else if (windSpeedPos != NULL) {
                                         // Extract data after "=" for WindSpeed
                                         strcpy(windVel, windSpeedPos + 15); // Add 12 to skip "WindSpeed = "
+                                        velSum += int(float(windVel) * 100);
+                                        velCount++;
                                     } else if (windGustPos != NULL) {
                                         strcpy(windGust, windGustPos + 15); // Add 12 to skip "WindSpeed = "
+                                        gust += int(float(windDir) * 10)
                                     }
                                 }
 
@@ -256,11 +268,20 @@ int32_t SerialModule::runOnce()
                                 lineStart = lineEnd + 1;
                             }
                         }
-                        Serial.printf("Wind : %s %sg%s", windDir, windVel, windGust);
-                        // Serial.println(formattedString);
                     }
                 }
-                strcpy(serialBytes, formattedString);
+                if (gotwind) {
+                    LOG_INFO("Wind : %s %sg%s\n", windDir, windVel, windGust);
+                }
+                if (gotwind && millis() - lastAveraged > averageIntervalMillis) {
+                    // calulate average and send to the mesh
+                    LOG_INFO("DOING WIND AVERAGE");
+                    int velAvg = velSum / velCount;
+                    int dirAvg = dirSum / dirCount;
+                    // gust = gust
+                }
+                // Serial.println(formattedString);
+                // strcpy(serialBytes, formattedString);
                 // serialModuleRadio->sendPayload();
             } else { // if Serial_Mode == Default or Simple
                 while (Serial2.available()) {

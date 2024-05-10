@@ -68,6 +68,7 @@ static Print *serialPrint = &Serial2;
 
 char serialBytes[meshtastic_Constants_DATA_PAYLOAD_LEN];
 size_t serialPayloadSize;
+char formattedString[16]; // Adjust the size as needed
 
 int dirSum = 0;
 int velSum = 0;
@@ -75,12 +76,13 @@ int gust = 0;
 int velCount = 0;
 int dirCount = 0;
 unsigned int lastAveraged = millis();
-const int averageIntervalMillis = 300000; // 5 minutes
+const int averageIntervalMillis = 300000; // interval
 SerialModuleRadio::SerialModuleRadio() : MeshModule("SerialModuleRadio")
 {
     switch (moduleConfig.serial.mode) {
     case meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG:
-        ourPortNum = meshtastic_PortNum_TEXT_MESSAGE_APP;
+        ourPortNum = meshtastic_PortNum_SERIAL_APP;
+        // boundChannel = Channels::serialChannel;
         break;
     case meshtastic_ModuleConfig_SerialConfig_Serial_Mode_NMEA:
     case meshtastic_ModuleConfig_SerialConfig_Serial_Mode_CALTOPO:
@@ -212,6 +214,10 @@ int32_t SerialModule::runOnce()
                      meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) // using this for WS80 for now
             {
                 bool gotwind = false;
+                static char windDir[4] = "xxx";   // Assuming windDir is 3 characters long + null terminator
+                static char windVel[5] = "xx.x";  // Assuming windVel is 4 characters long + null terminator
+                static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator
+
                 while (Serial2.available()) {
                     // clear serialBytes buffer
                     memset(serialBytes, '\0', sizeof(serialBytes));
@@ -237,11 +243,6 @@ int32_t SerialModule::runOnce()
 
                                 if (strstr(line, "Wind") != NULL) // we have a wind line
                                 {
-                                    static char windDir[4] = "xxx";   // Assuming windDir is 3 characters long + null terminator
-                                    static char windVel[5] = "xx.x";  // Assuming windVel is 4 characters long + null terminator
-                                    static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator
-                                    char formattedString[16];
-
                                     gotwind = true;
                                     // Find the positions of "=" signs in the line
                                     char *windDirPos = strstr(line, "WindDir      = ");
@@ -250,17 +251,19 @@ int32_t SerialModule::runOnce()
 
                                     if (windDirPos != NULL) {
                                         // Extract data after "=" for WindDir
-                                        strcpy(windDir, windDirPos + 15); // Add 10 to skip "WindDir = "
-                                        dirSum += int(windDir);
+                                        strcpy(windDir, windDirPos + 15); // Add 15 to skip "WindDir = "
+                                        dirSum += atoi(windDir);
                                         dirCount++;
                                     } else if (windSpeedPos != NULL) {
                                         // Extract data after "=" for WindSpeed
-                                        strcpy(windVel, windSpeedPos + 15); // Add 12 to skip "WindSpeed = "
-                                        velSum += int(float(windVel) * 100);
+                                        strcpy(windVel, windSpeedPos + 15); // Add 15 to skip "WindSpeed = "
+                                        velSum += int(strtof(windVel, nullptr) * 10);
                                         velCount++;
                                     } else if (windGustPos != NULL) {
-                                        strcpy(windGust, windGustPos + 15); // Add 12 to skip "WindSpeed = "
-                                        gust += int(float(windDir) * 10)
+                                        strcpy(windGust, windGustPos + 15); // Add 15 to skip "WindSpeed = "
+                                        int newg = static_cast<int>(strtof(windGust, nullptr) * 10);
+                                        if (newg > gust)
+                                            gust = newg;
                                     }
                                 }
 
@@ -275,16 +278,27 @@ int32_t SerialModule::runOnce()
                 }
                 if (gotwind && millis() - lastAveraged > averageIntervalMillis) {
                     // calulate average and send to the mesh
-                    LOG_INFO("DOING WIND AVERAGE");
-                    int velAvg = velSum / velCount;
+                    // LOG_INFO("DOING WIND AVERAGE with %i %i %i %i %i", velSum, velCount, dirSum, dirCount, gust);
+                    int velAvg = 1.0 * velSum / velCount;
                     int dirAvg = dirSum / dirCount;
                     // gust = gust
+                    sprintf(formattedString, "%i %ig%i", dirAvg, velAvg, gust);
+                    lastAveraged = millis();
+                    velSum = velCount = dirSum = dirCount = 0;
+                    gust = 0;
+                    LOG_INFO("Wind Average : %s\n", formattedString);
+
+                    // clear serialBytes first;
+                    memset(serialBytes, '\0', sizeof(serialBytes));
+                    strcpy(serialBytes, formattedString);
+                    LOG_INFO("Sending Wind Packet bytes: %s", serialBytes);
+                    serialModuleRadio->sendPayload();
+                    // return (2000); // don't return for a 2 seconds, allow for transmission.
                 }
                 // Serial.println(formattedString);
-                // strcpy(serialBytes, formattedString);
-                // serialModuleRadio->sendPayload();
             } else { // if Serial_Mode == Default or Simple
                 while (Serial2.available()) {
+                    LOG_INFO("SENDING SIMPLE PALOAD");
                     serialPayloadSize = Serial2.readBytes(serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN);
                     serialModuleRadio->sendPayload();
                 }

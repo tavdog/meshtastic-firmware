@@ -82,15 +82,14 @@ SerialModuleRadio::SerialModuleRadio() : MeshModule("SerialModuleRadio")
 {
     switch (moduleConfig.serial.mode) {
     case meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG:
-        ourPortNum = meshtastic_PortNum_SERIAL_APP;
-        // boundChannel = Channels::serialChannel;
+        ourPortNum = meshtastic_PortNum_TEXT_MESSAGE_APP;
         break;
     case meshtastic_ModuleConfig_SerialConfig_Serial_Mode_NMEA:
     case meshtastic_ModuleConfig_SerialConfig_Serial_Mode_CALTOPO:
         ourPortNum = meshtastic_PortNum_POSITION_APP;
         break;
     default:
-        ourPortNum = meshtastic_PortNum_SERIAL_APP;
+        ourPortNum = meshtastic_PortNum_TEXT_MESSAGE_APP;
         // restrict to the serial channel for rx
         boundChannel = Channels::serialChannel;
         break;
@@ -188,7 +187,6 @@ int32_t SerialModule::runOnce()
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO) {
                 emitRebooted();
             }
-        } else { // not first time
         } else { // not first time
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO) {
                 return runOncePart();

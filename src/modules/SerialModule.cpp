@@ -7,6 +7,9 @@
 #include "configuration.h"
 #include <Arduino.h>
 
+// RAK5811
+#define NO_OF_SAMPLES 32
+
 /*
     SerialModule
         A simple interface to send messages over the mesh network by sending strings
@@ -50,7 +53,6 @@
 #define RX_BUFFER 256
 #define TIMEOUT 250
 #define BAUD 115200
-#define BAUD 115200
 #define ACK 1
 
 // API: Defaulting to the formerly removed phone_timeout_secs value of 15 minutes
@@ -71,13 +73,10 @@ char serialBytes[meshtastic_Constants_DATA_PAYLOAD_LEN];
 size_t serialPayloadSize;
 char formattedString[16]; // Adjust the size as needed
 
-int dirSum = 0;
-int velSum = 0;
-int gust = 0;
-int velCount = 0;
-int dirCount = 0;
-unsigned int lastAveraged = millis();
-const int averageIntervalMillis = 300000; // interval
+unsigned int lastSampleTime = millis();
+unsigned int sampleInterval = 30000; // interval in millis
+#define NO_OF_SAMPLES 32             // number of analog samples to average
+
 SerialModuleRadio::SerialModuleRadio() : MeshModule("SerialModuleRadio")
 {
     switch (moduleConfig.serial.mode) {
@@ -129,6 +128,19 @@ int32_t SerialModule::runOnce()
 
     if (moduleConfig.serial.override_console_serial_port || (moduleConfig.serial.rxd && moduleConfig.serial.txd)) {
         if (firstTime) {
+
+            LOG_INFO("INITIALIZING RAK5811");
+            // init the RAK5811
+            /* WisBLOCK 5811 Power On*/
+
+            pinMode(RAK5811_ENABLE, OUTPUT);
+            digitalWrite(RAK5811_ENABLE, HIGH);
+            /* WisBLOCK 5811 Power On*/
+
+            pinMode(RAK5811_ANALOG, INPUT_PULLDOWN);
+            analogReference(AR_INTERNAL_3_0);
+            analogOversampling(128);
+
             // Interface with the serial peripheral from in here.
             LOG_INFO("Initializing serial peripheral interface\n");
 
@@ -156,7 +168,6 @@ int32_t SerialModule::runOnce()
             }
 #elif !defined(TTGO_T_ECHO) && !defined(CANARYONE)
             if (moduleConfig.serial.rxd && moduleConfig.serial.txd) {
-                LOG_INFO("SETTING SERIAL2 PINS");
                 LOG_INFO("SETTING SERIAL2 PINS");
 #ifdef ARCH_RP2040
                 Serial2.setFIFOSize(RX_BUFFER);
@@ -214,87 +225,36 @@ int32_t SerialModule::runOnce()
             else if (moduleConfig.serial.mode ==
                      meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) // using this for WS80 for now
             {
-                bool gotwind = false;
-                static char windDir[4] = "xxx";   // Assuming windDir is 3 characters long + null terminator
-                static char windVel[5] = "xx.x";  // Assuming windVel is 4 characters long + null terminator
-                static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator
+                if (millis() - lastSampleTime > sampleInterval) {
+                    LOG_INFO("Sampling RAK5811");
+                    // taken directly from Arudinno example for RAK5811
+                    int i;
+                    int mcu_ain_raw = 0;
+                    int average_raw;
+                    float mcu_ain_voltage;
+                    float voltage_sensor; // variable to store the value coming from the sensor
 
-                while (Serial2.available()) {
-                    // clear serialBytes buffer
-                    memset(serialBytes, '\0', sizeof(serialBytes));
-                    memset(formattedString, '\0', sizeof(formattedString));
-                    serialPayloadSize = Serial2.readBytes(serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN);
-                    // check for a string we care about
-                    // WindDir = 173
-                    // 19 : 21 : 37.325->WindSpeed = 0.0
-                    // 19 : 21 : 37.325->WindGust = 0.5
-                    if (serialPayloadSize > 0) {
-                        // Define variables for line processing
-                        int lineStart = 0;
-                        int lineEnd = -1;
-
-                        // Process each byte in the received data
-                        for (int i = 0; i < serialPayloadSize; i++) {
-                            if (serialBytes[i] == '\n') {
-                                lineEnd = i;
-                                // Extract the current line
-                                char line[meshtastic_Constants_DATA_PAYLOAD_LEN];
-                                memset(line, '\0', sizeof(line));
-                                memcpy(line, &serialBytes[lineStart], lineEnd - lineStart);
-
-                                if (strstr(line, "Wind") != NULL) // we have a wind line
-                                {
-                                    gotwind = true;
-                                    // Find the positions of "=" signs in the line
-                                    char *windDirPos = strstr(line, "WindDir      = ");
-                                    char *windSpeedPos = strstr(line, "WindSpeed    = ");
-                                    char *windGustPos = strstr(line, "WindGust     = ");
-
-                                    if (windDirPos != NULL) {
-                                        // Extract data after "=" for WindDir
-                                        strcpy(windDir, windDirPos + 15); // Add 15 to skip "WindDir = "
-                                        dirSum += atoi(windDir);
-                                        dirCount++;
-                                    } else if (windSpeedPos != NULL) {
-                                        // Extract data after "=" for WindSpeed
-                                        strcpy(windVel, windSpeedPos + 15); // Add 15 to skip "WindSpeed = "
-                                        velSum += int(strtof(windVel, nullptr) * 10);
-                                        velCount++;
-                                    } else if (windGustPos != NULL) {
-                                        strcpy(windGust, windGustPos + 15); // Add 15 to skip "WindSpeed = "
-                                        int newg = static_cast<int>(strtof(windGust, nullptr) * 10);
-                                        if (newg > gust)
-                                            gust = newg;
-                                    }
-                                }
-
-                                // Update lineStart for the next line
-                                lineStart = lineEnd + 1;
-                            }
-                        }
+                    for (i = 0; i < NO_OF_SAMPLES; i++) {
+                        mcu_ain_raw += analogRead(RAK5811_ANALOG); // the input pin A1 for the potentiometer
                     }
-                }
-                if (gotwind) {
-                    LOG_INFO("Wind : %s %sg%s\n", windDir, windVel, windGust);
-                }
-                if (gotwind && millis() - lastAveraged > averageIntervalMillis) {
-                    // calulate average and send to the mesh
-                    // LOG_INFO("DOING WIND AVERAGE with %i %i %i %i %i", velSum, velCount, dirSum, dirCount, gust);
-                    int velAvg = 1.0 * velSum / velCount;
-                    int dirAvg = dirSum / dirCount;
-                    // gust = gust
-                    sprintf(formattedString, "%i %ig%i", dirAvg, velAvg, gust);
-                    lastAveraged = millis();
-                    velSum = velCount = dirSum = dirCount = 0;
-                    gust = 0;
-                    LOG_INFO("Wind Average : %s\n", formattedString);
+                    average_raw = mcu_ain_raw / i;
+
+                    mcu_ain_voltage = average_raw * 3.0 / 1024; // raef 3.0V / 10bit ADC
+
+                    LOG_INFO("-------average_value------ = %d\n", average_raw);
+                    LOG_INFO("-------voltage_sensor------ = %f\n", voltage_sensor);
+
+                    voltage_sensor =
+                        mcu_ain_voltage / 0.6; // WisBlock RAK5811 (0 ~ 5V).   Input signal reduced to 6/10 and output
+                    sprintf(formattedString, "%f %f", average_raw, voltage_sensor);
+                    lastSampleTime = millis();
+                    LOG_INFO("String to transmit : %s\n", formattedString);
 
                     // clear serialBytes first;
                     memset(serialBytes, '\0', sizeof(serialBytes));
                     strcpy(serialBytes, formattedString);
-                    LOG_INFO("Sending Wind Packet bytes: %s", serialBytes);
                     serialModuleRadio->sendPayload();
-                    // return (2000); // don't return for a 2 seconds, allow for transmission.
+                    return (10000); // don't return for a 10 seconds.
                 }
                 // Serial.println(formattedString);
             } else { // if Serial_Mode == Default or Simple

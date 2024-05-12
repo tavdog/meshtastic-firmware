@@ -21,6 +21,9 @@
 
 #define RAK4630
 
+#define RAK5811_ENABLE 32
+#define RAK5811_ANALOG 22
+
 #define MESHTASTIC_EXCLUDE_SCREEN 1
 /** Master clock frequency */
 #define VARIANT_MCK (64000000ul)

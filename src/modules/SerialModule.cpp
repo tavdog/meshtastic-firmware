@@ -115,7 +115,7 @@ int32_t SerialModule::runOnce()
         without having to configure it from the PythonAPI or WebUI.
     */
 
-    moduleConfig.serial.enabled = true;
+    // moduleConfig.serial.enabled = true;
     // moduleConfig.serial.rxd = 35;
     // moduleConfig.serial.txd = 15;
     // moduleConfig.serial.override_console_serial_port = true;

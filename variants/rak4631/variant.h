@@ -21,10 +21,13 @@
 
 #define RAK4630
 
-#define RAK5811_ENABLE 32
-#define RAK5811_ANALOG 22
+// following is for reading analog sensor
+#define BOOST_ENABLE 17
+#define AIN1_PIN 31
+#define AIN2_PIN 4
+#define NO_OF_ANALOG_SAMPLES 12
+#define INTERVAL_OF_SAMPLES 30000
 
-#define MESHTASTIC_EXCLUDE_SCREEN 1
 /** Master clock frequency */
 #define VARIANT_MCK (64000000ul)
 

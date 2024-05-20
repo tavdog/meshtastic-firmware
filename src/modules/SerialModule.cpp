@@ -7,9 +7,6 @@
 #include "configuration.h"
 #include <Arduino.h>
 
-// RAK5811
-#define NO_OF_SAMPLES 32
-
 /*
     SerialModule
         A simple interface to send messages over the mesh network by sending strings
@@ -52,7 +49,7 @@
 
 #define RX_BUFFER 256
 #define TIMEOUT 250
-#define BAUD 115200
+#define BAUD 38400
 #define ACK 1
 
 // API: Defaulting to the formerly removed phone_timeout_secs value of 15 minutes
@@ -71,11 +68,10 @@ static Print *serialPrint = &Serial2;
 
 char serialBytes[meshtastic_Constants_DATA_PAYLOAD_LEN];
 size_t serialPayloadSize;
-char formattedString[16]; // Adjust the size as needed
 
+// following is needed for sending analog values to mesh
+char formattedString[30]; // Adjust the size as needed
 unsigned int lastSampleTime = millis();
-unsigned int sampleInterval = 30000; // interval in millis
-#define NO_OF_SAMPLES 32             // number of analog samples to average
 
 SerialModuleRadio::SerialModuleRadio() : MeshModule("SerialModuleRadio")
 {
@@ -88,7 +84,7 @@ SerialModuleRadio::SerialModuleRadio() : MeshModule("SerialModuleRadio")
         ourPortNum = meshtastic_PortNum_POSITION_APP;
         break;
     default:
-        ourPortNum = meshtastic_PortNum_TEXT_MESSAGE_APP;
+        ourPortNum = meshtastic_PortNum_SERIAL_APP;
         // restrict to the serial channel for rx
         boundChannel = Channels::serialChannel;
         break;
@@ -129,15 +125,11 @@ int32_t SerialModule::runOnce()
     if (moduleConfig.serial.override_console_serial_port || (moduleConfig.serial.rxd && moduleConfig.serial.txd)) {
         if (firstTime) {
 
-            LOG_INFO("INITIALIZING RAK5811");
-            // init the RAK5811
-            /* WisBLOCK 5811 Power On*/
-
-            pinMode(RAK5811_ENABLE, OUTPUT);
-            digitalWrite(RAK5811_ENABLE, HIGH);
-            /* WisBLOCK 5811 Power On*/
-
-            pinMode(RAK5811_ANALOG, INPUT_PULLDOWN);
+            // below is custom code for sending analog values to mesh
+            LOG_INFO("INITIALIZING RAK5811\n");
+            pinMode(BOOST_ENABLE, OUTPUT);
+            pinMode(AIN1_PIN, INPUT_PULLDOWN);
+            pinMode(AIN2_PIN, INPUT_PULLDOWN);
             analogReference(AR_INTERNAL_3_0);
             analogOversampling(128);
 
@@ -168,7 +160,6 @@ int32_t SerialModule::runOnce()
             }
 #elif !defined(TTGO_T_ECHO) && !defined(CANARYONE)
             if (moduleConfig.serial.rxd && moduleConfig.serial.txd) {
-                LOG_INFO("SETTING SERIAL2 PINS");
 #ifdef ARCH_RP2040
                 Serial2.setFIFOSize(RX_BUFFER);
                 Serial2.setPinout(moduleConfig.serial.txd, moduleConfig.serial.rxd);
@@ -221,45 +212,50 @@ int32_t SerialModule::runOnce()
                 }
             }
 #if !defined(TTGO_T_ECHO) && !defined(CANARYONE)
-
             else if (moduleConfig.serial.mode ==
-                     meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) // using this for WS80 for now
-            {
-                if (millis() - lastSampleTime > sampleInterval) {
-                    LOG_INFO("Sampling RAK5811");
-                    // taken directly from Arudinno example for RAK5811
-                    int i;
-                    int mcu_ain_raw = 0;
-                    int average_raw;
-                    float mcu_ain_voltage;
-                    float voltage_sensor; // variable to store the value coming from the sensor
+                     meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) { // using this to send analog values to mesh
+                digitalWrite(BOOST_ENABLE, HIGH);
+                LOG_INFO("Sampling RAK5811\n");
 
-                    for (i = 0; i < NO_OF_SAMPLES; i++) {
-                        mcu_ain_raw += analogRead(RAK5811_ANALOG); // the input pin A1 for the potentiometer
-                    }
-                    average_raw = mcu_ain_raw / i;
+                int i;
+                int mcu_ain_raw = 0;
+                int average_raw;
+                float mcu_ain_voltage;
+                float voltage_sensor1;
+                float voltage_sensor2;
 
-                    mcu_ain_voltage = average_raw * 3.0 / 1024; // raef 3.0V / 10bit ADC
-
-                    LOG_INFO("-------average_value------ = %d\n", average_raw);
-                    LOG_INFO("-------voltage_sensor------ = %f\n", voltage_sensor);
-
-                    voltage_sensor =
-                        mcu_ain_voltage / 0.6; // WisBlock RAK5811 (0 ~ 5V).   Input signal reduced to 6/10 and output
-                    sprintf(formattedString, "%f %f", average_raw, voltage_sensor);
-                    lastSampleTime = millis();
-                    LOG_INFO("String to transmit : %s\n", formattedString);
-
-                    // clear serialBytes first;
-                    memset(serialBytes, '\0', sizeof(serialBytes));
-                    strcpy(serialBytes, formattedString);
-                    serialModuleRadio->sendPayload();
-                    return (10000); // don't return for a 10 seconds.
+                // first sensor
+                for (i = 0; i < NO_OF_ANALOG_SAMPLES; i++) {
+                    mcu_ain_raw += analogRead(AIN1_PIN);
                 }
-                // Serial.println(formattedString);
-            } else { // if Serial_Mode == Default or Simple
+                average_raw = mcu_ain_raw / i;
+                mcu_ain_voltage = average_raw * 3.0 / 1024; // raef 3.0V / 10bit ADC
+                voltage_sensor1 = mcu_ain_voltage / 0.6; // WisBlock RAK5811 (0 ~ 5V).   Input signal reduced to 6/10 and output
+
+                // 2nd sensor
+                mcu_ain_raw = 0;
+                i = 0;
+                for (i = 0; i < NO_OF_ANALOG_SAMPLES; i++) {
+                    mcu_ain_raw += analogRead(AIN2_PIN);
+                }
+                average_raw = mcu_ain_raw / i;
+                mcu_ain_voltage = average_raw * 3.0 / 1024; // raef 3.0V / 10bit ADC
+                voltage_sensor2 = mcu_ain_voltage / 0.6; // WisBlock RAK5811 (0 ~ 5V).   Input signal reduced to 6/10 and output
+
+                LOG_INFO("-------voltage_sensor1------ = %f\n", voltage_sensor1);
+                LOG_INFO("-------voltage_sensor2------ = %f\n", voltage_sensor2);
+
+                sprintf(formattedString, "{\"A1\":%.4f,\"A2\":%.4f}", voltage_sensor1, voltage_sensor2);
+                // sprintf(formattedString, "Test Message Unify");
+                LOG_INFO("String to transmit : %s\n", formattedString);
+                serialPayloadSize = strlen(formattedString);
+                // clear serialBytes first;
+                memset(serialBytes, '\0', sizeof(serialBytes));
+                strcpy(serialBytes, formattedString);
+                serialModuleRadio->sendPayload();
+                return (INTERVAL_OF_SAMPLES);
+            } else {
                 while (Serial2.available()) {
-                    LOG_INFO("SENDING SIMPLE PALOAD");
                     serialPayloadSize = Serial2.readBytes(serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN);
                     serialModuleRadio->sendPayload();
                 }

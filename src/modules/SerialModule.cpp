@@ -77,7 +77,9 @@ int gust = 0;
 int velCount = 0;
 int dirCount = 0;
 unsigned int lastAveraged = millis();
-const int averageIntervalMillis = 300000; // interval
+
+// user timeout setting as interval instead.
+unsigned int averageIntervalMillis = moduleConfig.serial.timeout > 0 ? moduleConfig.serial.timeout : 300000; // interval
 SerialModuleRadio::SerialModuleRadio() : MeshModule("SerialModuleRadio")
 {
     switch (moduleConfig.serial.mode) {
@@ -123,12 +125,15 @@ int32_t SerialModule::runOnce()
     // moduleConfig.serial.mode = meshtastic_ModuleConfig_SerialConfig_Serial_Mode_CALTOPO;
     // moduleConfig.serial.timeout = 1000;
     // moduleConfig.serial.echo = 1;
+    // averageIntervalMillis = moduleConfig.serial.timeout > 0 ? moduleConfig.serial.timeout : 300000; // interval
 
     if (!moduleConfig.serial.enabled)
         return disable();
 
     if (moduleConfig.serial.override_console_serial_port || (moduleConfig.serial.rxd && moduleConfig.serial.txd)) {
         if (firstTime) {
+            averageIntervalMillis = moduleConfig.serial.timeout > 0 ? moduleConfig.serial.timeout : 300000; // interval
+            LOG_INFO("Wind Average Interval is : %i \n", averageIntervalMillis);
             // Interface with the serial peripheral from in here.
             LOG_INFO("Initializing serial peripheral interface\n");
 
@@ -152,7 +157,7 @@ int32_t SerialModule::runOnce()
                 Serial2.begin(baud, SERIAL_8N1, moduleConfig.serial.rxd, moduleConfig.serial.txd);
             } else {
                 Serial.begin(baud);
-                Serial.setTimeout(moduleConfig.serial.timeout > 0 ? moduleConfig.serial.timeout : TIMEOUT);
+                Serial.setTimeout(TIMEOUT);
             }
 #elif !defined(TTGO_T_ECHO) && !defined(CANARYONE)
             if (moduleConfig.serial.rxd && moduleConfig.serial.txd) {
@@ -165,19 +170,19 @@ int32_t SerialModule::runOnce()
                 Serial2.setPins(moduleConfig.serial.rxd, moduleConfig.serial.txd);
 #endif
                 Serial2.begin(baud, SERIAL_8N1);
-                Serial2.setTimeout(moduleConfig.serial.timeout > 0 ? moduleConfig.serial.timeout : TIMEOUT);
+                Serial2.setTimeout(TIMEOUT);
             } else {
 #ifdef RP2040_SLOW_CLOCK
                 Serial2.begin(baud, SERIAL_8N1);
-                Serial2.setTimeout(moduleConfig.serial.timeout > 0 ? moduleConfig.serial.timeout : TIMEOUT);
+                Serial2.setTimeout(TIMEOUT);
 #else
                 Serial.begin(baud, SERIAL_8N1);
-                Serial.setTimeout(moduleConfig.serial.timeout > 0 ? moduleConfig.serial.timeout : TIMEOUT);
+                Serial.setTimeout(TIMEOUT);
 #endif
             }
 #else
             Serial.begin(baud, SERIAL_8N1);
-            Serial.setTimeout(moduleConfig.serial.timeout > 0 ? moduleConfig.serial.timeout : TIMEOUT);
+            Serial.setTimeout(TIMEOUT);
 #endif
             serialModuleRadio = new SerialModuleRadio();
 

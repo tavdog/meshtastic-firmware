@@ -223,6 +223,8 @@ int32_t SerialModule::runOnce()
                 static char windDir[4] = "xxx";   // Assuming windDir is 3 characters long + null terminator
                 static char windVel[5] = "xx.x";  // Assuming windVel is 4 characters long + null terminator
                 static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator
+                static char batVoltage[4] = "0.0";
+                static int batVoltageInt = 0;
 
                 while (Serial2.available()) {
                     // clear serialBytes buffer
@@ -271,6 +273,16 @@ int32_t SerialModule::runOnce()
                                         if (newg > gust)
                                             gust = newg;
                                     }
+                                } else if (strstr(line, "BatVoltage") != NULL) { // we have a battVoltage line
+                                    char *battVoltagePos = strstr(line, "BatVoltage      = ");
+                                    if (battVoltagePos != NULL) {
+                                        strcpy(batVoltage, battVoltagePos + 18); // Add 18 to skip "BatVoltage = "
+                                        char *endptr;
+                                        float voltage_f = strtof(batVoltage, &endptr);
+                                        if (*endptr == 'V') {
+                                            batVoltageInt = static_cast<int>(voltage_f * 10);
+                                        }
+                                    }
                                 }
 
                                 // Update lineStart for the next line
@@ -280,7 +292,7 @@ int32_t SerialModule::runOnce()
                     }
                 }
                 if (gotwind) {
-                    LOG_INFO("Wind : %s %sg%s\n", windDir, windVel, windGust);
+                    LOG_INFO("WS80 : %s %sg%s %iv\n", windDir, windVel, windGust, batVoltageInt);
                 }
                 if (gotwind && millis() - lastAveraged > averageIntervalMillis) {
                     // calulate average and send to the mesh
@@ -288,11 +300,11 @@ int32_t SerialModule::runOnce()
                     int velAvg = 1.0 * velSum / velCount;
                     int dirAvg = dirSum / dirCount;
                     // gust = gust
-                    sprintf(formattedString, "%i %ig%i", dirAvg, velAvg, gust);
+                    sprintf(formattedString, "%i %ig%i %iv", dirAvg, velAvg, gust, batVoltageInt);
                     lastAveraged = millis();
                     velSum = velCount = dirSum = dirCount = 0;
                     gust = 0;
-                    LOG_INFO("Wind Average : %s\n", formattedString);
+                    LOG_INFO("Transmit WS80 : %s\n", formattedString);
 
                     // clear serialBytes first;
                     memset(serialBytes, '\0', sizeof(serialBytes));

@@ -7,5 +7,8 @@
   "[cpp]": {
     "editor.defaultFormatter": "ms-vscode.cpptools"
   },
-  "C_Cpp.dimInactiveRegions": false
+  "C_Cpp.dimInactiveRegions": false,
+  "files.associations": {
+    "cstdlib": "cpp"
+  }
 }

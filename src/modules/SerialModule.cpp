@@ -223,8 +223,8 @@ int32_t SerialModule::runOnce()
                 static char windDir[4] = "xxx";   // Assuming windDir is 3 characters long + null terminator
                 static char windVel[5] = "xx.x";  // Assuming windVel is 4 characters long + null terminator
                 static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator
-                static char batVoltage[4] = "0.0";
-                static int batVoltageInt = 0;
+                static char batVoltage[5] = "0.0V";
+                static int batVoltageInt = 01;
 
                 while (Serial2.available()) {
                     // clear serialBytes buffer
@@ -274,14 +274,12 @@ int32_t SerialModule::runOnce()
                                             gust = newg;
                                     }
                                 } else if (strstr(line, "BatVoltage") != NULL) { // we have a battVoltage line
-                                    char *battVoltagePos = strstr(line, "BatVoltage      = ");
-                                    if (battVoltagePos != NULL) {
-                                        strcpy(batVoltage, battVoltagePos + 18); // Add 18 to skip "BatVoltage = "
+                                    char *batVoltagePos = strstr(line, "BatVoltage      = ");
+                                    if (batVoltagePos != NULL) {
+                                        strcpy(batVoltage, batVoltagePos + 18); // Add 18 to skip "BatVoltage = "
                                         char *endptr;
                                         float voltage_f = strtof(batVoltage, &endptr);
-                                        if (*endptr == 'V') {
-                                            batVoltageInt = static_cast<int>(voltage_f * 10);
-                                        }
+                                        batVoltageInt = static_cast<int>(voltage_f * 10);
                                     }
                                 }
 

@@ -1,11 +1,7 @@
-#include "configuration.h"
-
-#if !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
-
+#include "VEML7700Sensor.h"
 #include "../mesh/generated/meshtastic/telemetry.pb.h"
 #include "TelemetrySensor.h"
-#include "VEML7700Sensor.h"
-
+#include "configuration.h"
 #include <Adafruit_VEML7700.h>
 #include <typeinfo>
 
@@ -62,4 +58,3 @@ bool VEML7700Sensor::getMetrics(meshtastic_Telemetry *measurement)
 
     return true;
 }
-#endif

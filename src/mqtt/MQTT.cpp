@@ -396,7 +396,6 @@ bool MQTT::wantsLink() const
 
 int32_t MQTT::runOnce()
 {
-#ifdef HAS_NETWORKING
     if (!moduleConfig.mqtt.enabled || !(moduleConfig.mqtt.map_reporting_enabled || channels.anyMqttEnabled()))
         return disable();
 
@@ -409,7 +408,7 @@ int32_t MQTT::runOnce()
         publishQueuedMessages();
         return 200;
     }
-
+#ifdef HAS_NETWORKING
     else if (!pubSub.loop()) {
         if (!wantConnection)
             return 5000; // If we don't want connection now, check again in 5 secs

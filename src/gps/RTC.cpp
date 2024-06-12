@@ -96,17 +96,13 @@ void readFromRTC()
  *
  * If we haven't yet set our RTC this boot, set it from a GPS derived time
  */
-bool perhapsSetRTC(RTCQuality q, const struct timeval *tv, bool forceUpdate)
+bool perhapsSetRTC(RTCQuality q, const struct timeval *tv)
 {
     static uint32_t lastSetMsec = 0;
     uint32_t now = millis();
 
     bool shouldSet;
-    if (forceUpdate) {
-        shouldSet = true;
-        LOG_DEBUG("Overriding current RTC quality (%s) with incoming time of RTC quality of %s\n", RtcName(currentQuality),
-                  RtcName(q));
-    } else if (q > currentQuality) {
+    if (q > currentQuality) {
         shouldSet = true;
         LOG_DEBUG("Upgrading time to quality %s\n", RtcName(q));
     } else if (q >= RTCQualityNTP && (now - lastSetMsec) > (12 * 60 * 60 * 1000UL)) {
@@ -222,8 +218,9 @@ bool perhapsSetRTC(RTCQuality q, struct tm &t)
  */
 int32_t getTZOffset()
 {
-    time_t now = getTime(false);
+    time_t now;
     struct tm *gmt;
+    now = time(NULL);
     gmt = gmtime(&now);
     gmt->tm_isdst = -1;
     return (int32_t)difftime(now, mktime(gmt));

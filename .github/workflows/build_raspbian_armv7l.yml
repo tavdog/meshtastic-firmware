@@ -1,4 +1,4 @@
-name: Build Raspbian Arm
+name: Build Raspbian
 
 on: workflow_call
 

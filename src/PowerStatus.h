@@ -59,18 +59,9 @@ class PowerStatus : public Status
     int getBatteryVoltageMv() const { return batteryVoltageMv; }
 
     /**
-     * Note: for boards with battery pin or PMU, 0% battery means 'unknown/this board doesn't have a battery installed'
+     * Note: 0% battery means 'unknown/this board doesn't have a battery installed'
      */
-#if defined(HAS_PMU) || defined(BATTERY_PIN)
     uint8_t getBatteryChargePercent() const { return getHasBattery() ? batteryChargePercent : 0; }
-#endif
-
-    /**
-     * Note: for boards without battery pin and PMU, 101% battery means 'the board is using external power'
-     */
-#if !defined(HAS_PMU) && !defined(BATTERY_PIN)
-    uint8_t getBatteryChargePercent() const { return getHasBattery() ? batteryChargePercent : 101; }
-#endif
 
     bool matches(const PowerStatus *newStatus) const
     {

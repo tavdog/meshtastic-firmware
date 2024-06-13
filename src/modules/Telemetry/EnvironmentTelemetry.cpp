@@ -268,7 +268,12 @@ bool EnvironmentTelemetryModule::sendTelemetry(NodeNum dest, bool phoneOnly)
     m.which_variant = meshtastic_Telemetry_environment_metrics_tag;
 
     if (dfRobotLarkSensor.hasSensor()) {
-        valid = valid && dfRobotLarkSensor.getMetrics(&m);
+        if (phoneOnly) { // use the phoneOnly send to calculate the average (usually once per second)
+
+            valid = valid && dfRobotLarkSensor.getMetrics(&m);
+        } else { // when sending to the mesh calculate the averge.
+            valid = valid && dfRobotLarkSensor.getMetricsAverage(&m);
+        }
         hasSensor = true;
     }
     if (sht31Sensor.hasSensor()) {

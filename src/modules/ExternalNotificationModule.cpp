@@ -312,7 +312,7 @@ ExternalNotificationModule::ExternalNotificationModule()
         } else {
             display.setRotation(3);
         }
-        display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);
+        display.drawBitmap(-10, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);
         if (!config.display.flip_screen) {
             display.setRotation(2);
         } else {
@@ -321,7 +321,7 @@ ExternalNotificationModule::ExternalNotificationModule()
 
         display.setFont(&FreeMonoBold12pt7b);
         display.setTextColor(EPD_BLACK);
-        display.setCursor(115, 48);
+        display.setCursor(2, 16);
         display.print(devicestate.owner.long_name);
         display.display();
         LOG_INFO("DID EPD");
@@ -597,7 +597,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     token = strtok(NULL, " "); // throwaway the comma surrounded by spaces
     // Continue tokenization for AUX1 and AUX2
     token = strtok(NULL, "_");
-    char aux1[24] = "-"; // Assuming aux1 can be a maximum of 23 characters
+    char aux1[24] = "."; // Assuming aux1 can be a maximum of 23 characters
     if (token != nullptr) {
         strncpy(aux1, token, 23);
         aux1[23] = '\0'; // Null-terminate the aux1 string
@@ -605,12 +605,27 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
     // Tokenize again to get AUX2
     token = strtok(NULL, " -");
-    char aux2[24] = "-"; // Assuming aux2 can be a maximum of 23 characters
+    char aux2[24] = "."; // Assuming aux2 can be a maximum of 23 characters
     if (token != nullptr) {
         strncpy(aux2, token, 23);
         aux2[23] = '\0'; // Null-terminate the aux2 string
     }
 
+    int y_offset = 0;
+    // we can move all fields down and display a long label at the very top.
+    if (aux2[0] == '.') {
+        y_offset = 22;
+        display.setFont(&FreeMonoBold12pt7b);
+        display.setCursor(5, 16); // put this at the top because verything else is moved down.
+        display.setTextColor(EPD_BLACK);
+        display.print(devicestate.owner.long_name);
+    } else {
+        // DISPLAY LABEL normall but shorten if too long TODO
+        display.setFont(&FreeMonoBold12pt7b);
+        display.setCursor(84, 16);
+        display.setTextColor(EPD_BLACK);
+        display.print(devicestate.owner.short_name); // maximum 6
+    }
     // DISPLAY THE TIMESTAMP
     // Find the position of the 'T' character
     const char *timeStart = strstr(msg, "T");
@@ -631,7 +646,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     }
 
     display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(180, 16);
+    display.setCursor(180, 18 + y_offset);
     display.setTextColor(EPD_BLACK);
     display.print(timeBuffer);
 
@@ -642,36 +657,30 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
     // DISPLAY VELOCITY
     display.setFont(&FreeMonoBold24pt7b);
-    display.setCursor(60, 60);
+    display.setCursor(60, 60 + y_offset);
     display.setTextColor(EPD_BLACK);
     display.print(avg_g_gust);
     display.setFont(&FreeMonoBold9pt7b);
 
     // DISPLAY DIR
     display.setFont(&FreeMonoBold18pt7b);
-    display.setCursor(5, 30);
+    display.setCursor(5, 30 + y_offset);
     display.setTextColor(EPD_BLACK);
     display.print(dir);
-    display.setCursor(5, 60);
+    display.setCursor(5, 60 + y_offset);
     display.print(degree);
 
     // DISPLAY AUX1
     display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(10, 90);
+    display.setCursor(10, 90 + y_offset);
     display.setTextColor(EPD_BLACK);
     display.print(aux1);
 
     //  DISPLAY AUX2
     display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(10, 117);
+    display.setCursor(10, 117 + y_offset);
     display.setTextColor(EPD_BLACK);
     display.print(aux2);
-
-    // DISPLAY LABEL
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(84, 16);
-    display.setTextColor(EPD_BLACK);
-    display.print("Kanaha");
 
     display.display();
 

@@ -94,7 +94,11 @@ int MeshService::handleFromRadio(const meshtastic_MeshPacket *mp)
     } else if (mp->which_payload_variant == meshtastic_MeshPacket_decoded_tag && !nodeDB->getMeshNode(mp->from)->has_user &&
                nodeInfoModule) {
         LOG_INFO("Heard a node on channel %d we don't know, sending NodeInfo and asking for a response.\n", mp->channel);
-        nodeInfoModule->sendOurNodeInfo(mp->from, true, mp->channel);
+        if (airTime->isTxAllowedChannelUtil(true)) {
+            nodeInfoModule->sendOurNodeInfo(mp->from, true, mp->channel);
+        } else {
+            LOG_DEBUG("Skip sending NodeInfo due to > 25 percent channel util.\n");
+        }
     }
 
     printPacket("Forwarding to phone", mp);
@@ -193,12 +197,7 @@ void MeshService::handleToRadio(meshtastic_MeshPacket &p)
         return;
     }
 #endif
-    if (p.from != 0) { // We don't let phones assign nodenums to their sent messages
-        LOG_WARN("phone tried to pick a nodenum, we don't allow that.\n");
-        p.from = 0;
-    } else {
-        // p.from = nodeDB->getNodeNum();
-    }
+    p.from = 0; // We don't let phones assign nodenums to their sent messages
 
     if (p.id == 0)
         p.id = generatePacketId(); // If the phone didn't supply one, then pick one
@@ -263,22 +262,23 @@ void MeshService::sendToMesh(meshtastic_MeshPacket *p, RxSource src, bool ccToPh
         LOG_DEBUG("Can't send status to phone");
     }
 
-    if (ccToPhone) {
+    if (res == ERRNO_OK && ccToPhone) { // Check if p is not released in case it couldn't be sent
         sendToPhone(packetPool.allocCopy(*p));
     }
 }
 
-void MeshService::sendNetworkPing(NodeNum dest, bool wantReplies)
+bool MeshService::trySendPosition(NodeNum dest, bool wantReplies)
 {
     meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(nodeDB->getNodeNum());
 
     assert(node);
 
     if (hasValidPosition(node)) {
-#if HAS_GPS
+#if HAS_GPS && !MESHTASTIC_EXCLUDE_GPS
         if (positionModule) {
             LOG_INFO("Sending position ping to 0x%x, wantReplies=%d, channel=%d\n", dest, wantReplies, node->channel);
             positionModule->sendOurPosition(dest, wantReplies, node->channel);
+            return true;
         }
     } else {
 #endif
@@ -287,11 +287,23 @@ void MeshService::sendNetworkPing(NodeNum dest, bool wantReplies)
             nodeInfoModule->sendOurNodeInfo(dest, wantReplies, node->channel);
         }
     }
+    return false;
 }
 
 void MeshService::sendToPhone(meshtastic_MeshPacket *p)
 {
     perhapsDecode(p);
+
+#ifdef ARCH_ESP32
+#if !MESHTASTIC_EXCLUDE_STOREFORWARD
+    if (moduleConfig.store_forward.enabled && storeForwardModule->isServer() &&
+        p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP) {
+        releaseToPool(p); // Copy is already stored in StoreForward history
+        fromNum++;        // Notify observers for packet from radio
+        return;
+    }
+#endif
+#endif
 
     if (toPhoneQueue.numFree() == 0) {
         if (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP ||
@@ -303,6 +315,7 @@ void MeshService::sendToPhone(meshtastic_MeshPacket *p)
         } else {
             LOG_WARN("ToPhone queue is full, dropping packet.\n");
             releaseToPool(p);
+            fromNum++; // Make sure to notify observers in case they are reconnected so they can get the packets
             return;
         }
     }
@@ -377,8 +390,8 @@ int MeshService::onGPSChanged(const meshtastic::GPSStatus *newStatus)
     pos.time = getValidTime(RTCQualityFromNet);
 
     // In debug logs, identify position by @timestamp:stage (stage 4 = nodeDB)
-    LOG_DEBUG("onGPSChanged() pos@%x, time=%u, lat=%d, lon=%d, alt=%d\n", pos.timestamp, pos.time, pos.latitude_i,
-              pos.longitude_i, pos.altitude);
+    LOG_DEBUG("onGPSChanged() pos@%x time=%u lat=%d lon=%d alt=%d\n", pos.timestamp, pos.time, pos.latitude_i, pos.longitude_i,
+              pos.altitude);
 
     // Update our current position in the local DB
     nodeDB->updatePosition(nodeDB->getNodeNum(), pos, RX_SRC_LOCAL);

@@ -13,6 +13,11 @@
 #if (!HAS_RADIO && defined(ARCH_PORTDUINO)) || defined(SIMULATE_LORA)
 #include "../platform/portduino/SimRadio.h"
 #endif
+#ifdef ARCH_ESP32
+#if !MESHTASTIC_EXCLUDE_STOREFORWARD
+#include "modules/esp32/StoreForwardModule.h"
+#endif
+#endif
 
 extern Allocator<meshtastic_QueueStatus> &queueStatusPool;
 extern Allocator<meshtastic_MqttClientProxyMessage> &mqttClientProxyMessagePool;
@@ -108,8 +113,9 @@ class MeshService
     void reloadOwner(bool shouldSave = true);
 
     /// Called when the user wakes up our GUI, normally sends our latest location to the mesh (if we have it), otherwise at least
-    /// sends our owner
-    void sendNetworkPing(NodeNum dest, bool wantReplies = false);
+    /// sends our nodeinfo
+    /// returns true if we sent a position
+    bool trySendPosition(NodeNum dest, bool wantReplies = false);
 
     /// Send a packet into the mesh - note p must have been allocated from packetPool.  We will return it to that pool after
     /// sending. This is the ONLY function you should use for sending messages into the mesh, because it also updates the nodedb

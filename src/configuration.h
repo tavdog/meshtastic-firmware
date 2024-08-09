@@ -75,6 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 // -----------------------------------------------------------------------------
+// Regulatory overrides
+// -----------------------------------------------------------------------------
+
+// Override user saved region, for producing region-locked builds
+// #define REGULATORY_LORA_REGIONCODE meshtastic_Config_LoRaConfig_RegionCode_SG_923
+
+// Total system gain in dBm to subtract from Tx power to remain within regulatory ERP limit for non-licensed operators
+// This value should be set in variant.h and is PA gain + antenna gain (if system ships with an antenna)
+#ifndef REGULATORY_GAIN_LORA
+#define REGULATORY_GAIN_LORA 0
+#endif
+
+// -----------------------------------------------------------------------------
 // Feature toggles
 // -----------------------------------------------------------------------------
 
@@ -119,8 +132,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SHTC3_ADDR 0x70
 #define LPS22HB_ADDR 0x5C
 #define LPS22HB_ADDR_ALT 0x5D
-#define SHT31_ADDR 0x44
+#define SHT31_4x_ADDR 0x44
 #define PMSA0031_ADDR 0x12
+#define AHT10_ADDR 0x38
+#define RCWL9620_ADDR 0x57
+#define VEML7700_ADDR 0x10
+#define TSL25911_ADDR 0x29
+#define OPT3001_ADDR 0x45
+#define OPT3001_ADDR_ALT 0x44
+#define MLX90632_ADDR 0x3A
+#define DFROBOT_LARK_ADDR 0x42
+#define NAU7802_ADDR 0x2A
 
 // -----------------------------------------------------------------------------
 // ACCELEROMETER
@@ -128,6 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MPU6050_ADDR 0x68
 #define LIS3DH_ADR 0x18
 #define BMA423_ADDR 0x19
+#define LSM6DS3_ADDR 0x6A
+#define BMX160_ADDR 0x69
 
 // -----------------------------------------------------------------------------
 // LED
@@ -137,8 +161,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // -----------------------------------------------------------------------------
 // Security
 // -----------------------------------------------------------------------------
-
 #define ATECC608B_ADDR 0x35
+
+// -----------------------------------------------------------------------------
+// IO Expander
+// -----------------------------------------------------------------------------
+#define TCA9555_ADDR 0x26
 
 // -----------------------------------------------------------------------------
 // GPS
@@ -214,9 +242,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define HAS_BLUETOOTH 0
 #endif
 
-#include "DebugConfiguration.h"
-#include "RF95Configuration.h"
-
 #ifndef HW_VENDOR
 #error HW_VENDOR must be defined
 #endif
@@ -233,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MESHTASTIC_EXCLUDE_GPS 1
 #define MESHTASTIC_EXCLUDE_SCREEN 1
 #define MESHTASTIC_EXCLUDE_MQTT 1
+#define MESHTASTIC_EXCLUDE_POWERMON 1
 #endif
 
 // Turn off all optional modules
@@ -253,6 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MESHTASTIC_EXCLUDE_WAYPOINT 1
 #define MESHTASTIC_EXCLUDE_INPUTBROKER 1
 #define MESHTASTIC_EXCLUDE_SERIAL 1
+#define MESHTASTIC_EXCLUDE_POWERSTRESS 1
 #endif
 
 // // Turn off wifi even if HW supports wifi (webserver relies on wifi and is also disabled)
@@ -261,6 +288,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #undef HAS_WIFI
 #define HAS_WIFI 0
 #endif
+
+// Allow code that needs internet to just check HAS_NETWORKING rather than HAS_WIFI || HAS_ETHERNET
+#define HAS_NETWORKING (HAS_WIFI || HAS_ETHERNET)
 
 // // Turn off Bluetooth
 #ifdef MESHTASTIC_EXCLUDE_BLUETOOTH
@@ -281,3 +311,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #undef HAS_SCREEN
 #define HAS_SCREEN 0
 #endif
+
+#include "DebugConfiguration.h"
+#include "RF95Configuration.h"

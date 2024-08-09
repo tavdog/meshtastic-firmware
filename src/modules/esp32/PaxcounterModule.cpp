@@ -1,5 +1,5 @@
 #include "configuration.h"
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) && !MESHTASTIC_EXCLUDE_PAXCOUNTER
 #include "Default.h"
 #include "MeshService.h"
 #include "PaxcounterModule.h"
@@ -66,10 +66,6 @@ bool PaxcounterModule::handleReceivedProtobuf(const meshtastic_MeshPacket &mp, m
 
 meshtastic_MeshPacket *PaxcounterModule::allocReply()
 {
-    if (ignoreRequest) {
-        return NULL;
-    }
-
     meshtastic_Paxcount pl = meshtastic_Paxcount_init_default;
     pl.wifi = count_from_libpax.wifi_count;
     pl.ble = count_from_libpax.ble_count;
@@ -84,7 +80,7 @@ int32_t PaxcounterModule::runOnce()
             firstTime = false;
             LOG_DEBUG("Paxcounter starting up with interval of %d seconds\n",
                       Default::getConfiguredOrDefault(moduleConfig.paxcounter.paxcounter_update_interval,
-                                                      default_broadcast_interval_secs));
+                                                      default_telemetry_broadcast_interval_secs));
             struct libpax_config_t configuration;
             libpax_default_config(&configuration);
 
@@ -93,8 +89,8 @@ int32_t PaxcounterModule::runOnce()
             configuration.wificounter = 1;
             configuration.wifi_channel_map = WIFI_CHANNEL_ALL;
             configuration.wifi_channel_switch_interval = 50;
-            configuration.wifi_rssi_threshold = -80;
-            configuration.ble_rssi_threshold = -80;
+            configuration.wifi_rssi_threshold = Default::getConfiguredOrDefault(moduleConfig.paxcounter.wifi_threshold, -80);
+            configuration.ble_rssi_threshold = Default::getConfiguredOrDefault(moduleConfig.paxcounter.ble_threshold, -80);
             libpax_update_config(&configuration);
 
             // internal processing initialization
@@ -104,8 +100,8 @@ int32_t PaxcounterModule::runOnce()
         } else {
             sendInfo(NODENUM_BROADCAST);
         }
-        return Default::getConfiguredOrDefaultMs(moduleConfig.paxcounter.paxcounter_update_interval,
-                                                 default_broadcast_interval_secs);
+        return Default::getConfiguredOrDefaultMsScaled(moduleConfig.paxcounter.paxcounter_update_interval,
+                                                       default_telemetry_broadcast_interval_secs, numOnlineNodes);
     } else {
         return disable();
     }

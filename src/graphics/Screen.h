@@ -20,12 +20,14 @@ class Screen
     void setOn(bool) {}
     void print(const char *) {}
     void doDeepSleep() {}
-    void forceDisplay() {}
-    void startBluetoothPinScreen(uint32_t pin) {}
-    void stopBluetoothPinScreen() {}
-    void startRebootScreen() {}
-    void startShutdownScreen() {}
+    void forceDisplay(bool forceUiUpdate = false) {}
     void startFirmwareUpdateScreen() {}
+    void increaseBrightness() {}
+    void decreaseBrightness() {}
+    void setFunctionSymbal(std::string) {}
+    void removeFunctionSymbal(std::string) {}
+    void startAlert(const char *) {}
+    void endAlert() {}
 };
 } // namespace graphics
 #else
@@ -34,6 +36,8 @@ class Screen
 #include <OLEDDisplayUi.h>
 
 #include "../configuration.h"
+#include "gps/GeoCoord.h"
+#include "graphics/ScreenFonts.h"
 
 #ifdef USE_ST7567
 #include <ST7567Wire.h>
@@ -41,6 +45,8 @@ class Screen
 #include <SH1106Wire.h>
 #elif defined(USE_SSD1306)
 #include <SSD1306Wire.h>
+#elif defined(USE_ST7789)
+#include <ST7789Spi.h>
 #else
 // the SH1106/SSD1306 variant is auto-detected
 #include <AutoOLEDWire.h>
@@ -48,6 +54,7 @@ class Screen
 
 #include "EInkDisplay2.h"
 #include "EInkDynamicDisplay.h"
+#include "PointStruct.h"
 #include "TFTDisplay.h"
 #include "TypedQueue.h"
 #include "commands.h"
@@ -72,6 +79,54 @@ class Screen
 #ifndef MILES_TO_FEET
 #define MILES_TO_FEET 5280
 #endif
+
+// Intuitive colors. E-Ink display is inverted from OLED(?)
+#define EINK_BLACK OLEDDISPLAY_COLOR::WHITE
+#define EINK_WHITE OLEDDISPLAY_COLOR::BLACK
+
+// Base segment dimensions for T-Watch segmented display
+#define SEGMENT_WIDTH 16
+#define SEGMENT_HEIGHT 4
+
+/// Convert an integer GPS coords to a floating point
+#define DegD(i) (i * 1e-7)
+
+namespace
+{
+/// A basic 2D point class for drawing
+class Point
+{
+  public:
+    float x, y;
+
+    Point(float _x, float _y) : x(_x), y(_y) {}
+
+    /// Apply a rotation around zero (standard rotation matrix math)
+    void rotate(float radian)
+    {
+        float cos = cosf(radian), sin = sinf(radian);
+        float rx = x * cos + y * sin, ry = -x * sin + y * cos;
+
+        x = rx;
+        y = ry;
+    }
+
+    void translate(int16_t dx, int dy)
+    {
+        x += dx;
+        y += dy;
+    }
+
+    void scale(float f)
+    {
+        // We use -f here to counter the flip that happens
+        // on the y axis when drawing and rotating on screen
+        x *= f;
+        y *= -f;
+    }
+};
+
+} // namespace
 
 namespace graphics
 {
@@ -118,9 +173,11 @@ class Screen : public concurrency::OSThread
     CallbackObserver<Screen, const meshtastic_MeshPacket *> textMessageObserver =
         CallbackObserver<Screen, const meshtastic_MeshPacket *>(this, &Screen::handleTextMessage);
     CallbackObserver<Screen, const UIFrameEvent *> uiFrameEventObserver =
-        CallbackObserver<Screen, const UIFrameEvent *>(this, &Screen::handleUIFrameEvent);
+        CallbackObserver<Screen, const UIFrameEvent *>(this, &Screen::handleUIFrameEvent); // Sent by Mesh Modules
     CallbackObserver<Screen, const InputEvent *> inputObserver =
         CallbackObserver<Screen, const InputEvent *>(this, &Screen::handleInputEvent);
+    CallbackObserver<Screen, const meshtastic_AdminMessage *> adminMessageObserver =
+        CallbackObserver<Screen, const meshtastic_AdminMessage *>(this, &Screen::handleAdminMessage);
 
   public:
     explicit Screen(ScanI2C::DeviceAddress, meshtastic_Config_DisplayConfig_OledType, OLEDDISPLAY_GEOMETRY);
@@ -139,14 +196,14 @@ class Screen : public concurrency::OSThread
     // Not thread safe - must be called before any other methods are called.
     void setup();
 
-    /// Turns the screen on/off.
-    void setOn(bool on)
+    /// Turns the screen on/off. Optionally, pass a custom screensaver frame for E-Ink
+    void setOn(bool on, FrameCallback einkScreensaver = NULL)
     {
         if (!on)
-            handleSetOn(
-                false); // We handle off commands immediately, because they might be called because the CPU is shutting down
+            // We handle off commands immediately, because they might be called because the CPU is shutting down
+            handleSetOn(false, einkScreensaver);
         else
-            enqueueCmd(ScreenCmd{.cmd = on ? Cmd::SET_ON : Cmd::SET_OFF});
+            enqueueCmd(ScreenCmd{.cmd = Cmd::SET_ON});
     }
 
     /**
@@ -157,23 +214,49 @@ class Screen : public concurrency::OSThread
 
     void blink();
 
+    void drawFrameText(OLEDDisplay *, OLEDDisplayUiState *, int16_t, int16_t, const char *);
+
+    void getTimeAgoStr(uint32_t agoSecs, char *timeStr, uint8_t maxLength);
+
+    // Draw north
+    void drawCompassNorth(OLEDDisplay *display, int16_t compassX, int16_t compassY, float myHeading);
+
+    static uint16_t getCompassDiam(uint32_t displayWidth, uint32_t displayHeight);
+
+    float estimatedHeading(double lat, double lon);
+
+    void drawNodeHeading(OLEDDisplay *display, int16_t compassX, int16_t compassY, uint16_t compassDiam, float headingRadian);
+
+    void drawColumns(OLEDDisplay *display, int16_t x, int16_t y, const char **fields);
+
     /// Handle button press, trackball or swipe action)
     void onPress() { enqueueCmd(ScreenCmd{.cmd = Cmd::ON_PRESS}); }
     void showPrevFrame() { enqueueCmd(ScreenCmd{.cmd = Cmd::SHOW_PREV_FRAME}); }
     void showNextFrame() { enqueueCmd(ScreenCmd{.cmd = Cmd::SHOW_NEXT_FRAME}); }
 
-    // Implementation to Adjust Brightness
-    uint8_t brightness = BRIGHTNESS_DEFAULT;
+    // generic alert start
+    void startAlert(FrameCallback _alertFrame)
+    {
+        alertFrame = _alertFrame;
+        ScreenCmd cmd;
+        cmd.cmd = Cmd::START_ALERT_FRAME;
+        enqueueCmd(cmd);
+    }
 
-    /// Starts showing the Bluetooth PIN screen.
-    //
-    // Switches over to a static frame showing the Bluetooth pairing screen
-    // with the PIN.
-    void startBluetoothPinScreen(uint32_t pin)
+    void startAlert(const char *_alertMessage)
+    {
+        startAlert([_alertMessage](OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y) -> void {
+            uint16_t x_offset = display->width() / 2;
+            display->setTextAlignment(TEXT_ALIGN_CENTER);
+            display->setFont(FONT_MEDIUM);
+            display->drawString(x_offset + x, 26 + y, _alertMessage);
+        });
+    }
+
+    void endAlert()
     {
         ScreenCmd cmd;
-        cmd.cmd = Cmd::START_BLUETOOTH_PIN_SCREEN;
-        cmd.bluetooth_pin = pin;
+        cmd.cmd = Cmd::STOP_ALERT_FRAME;
         enqueueCmd(cmd);
     }
 
@@ -184,22 +267,23 @@ class Screen : public concurrency::OSThread
         enqueueCmd(cmd);
     }
 
-    void startShutdownScreen()
+    // Function to allow the AccelerometerThread to set the heading if a sensor provides it
+    // Mutex needed?
+    void setHeading(long _heading)
     {
-        ScreenCmd cmd;
-        cmd.cmd = Cmd::START_SHUTDOWN_SCREEN;
-        enqueueCmd(cmd);
+        hasCompass = true;
+        compassHeading = _heading;
     }
 
-    void startRebootScreen()
-    {
-        ScreenCmd cmd;
-        cmd.cmd = Cmd::START_REBOOT_SCREEN;
-        enqueueCmd(cmd);
-    }
+    bool hasHeading() { return hasCompass; }
 
-    /// Stops showing the bluetooth PIN screen.
-    void stopBluetoothPinScreen() { enqueueCmd(ScreenCmd{.cmd = Cmd::STOP_BLUETOOTH_PIN_SCREEN}); }
+    long getHeading() { return compassHeading; }
+    // functions for display brightness
+    void increaseBrightness();
+    void decreaseBrightness();
+
+    void setFunctionSymbal(std::string sym);
+    void removeFunctionSymbal(std::string sym);
 
     /// Stops showing the boot screen.
     void stopBootScreen() { enqueueCmd(ScreenCmd{.cmd = Cmd::STOP_BOOT_SCREEN}); }
@@ -312,14 +396,20 @@ class Screen : public concurrency::OSThread
     int handleTextMessage(const meshtastic_MeshPacket *arg);
     int handleUIFrameEvent(const UIFrameEvent *arg);
     int handleInputEvent(const InputEvent *arg);
+    int handleAdminMessage(const meshtastic_AdminMessage *arg);
 
     /// Used to force (super slow) eink displays to draw critical frames
-    void forceDisplay();
+    void forceDisplay(bool forceUiUpdate = false);
 
     /// Draws our SSL cert screen during boot (called from WebServer)
     void setSSLFrames();
 
     void setWelcomeFrames();
+
+#ifdef USE_EINK
+    /// Draw an image to remain on E-Ink display after screen off
+    void setScreensaverFrames(FrameCallback einkScreensaver = NULL);
+#endif
 
   protected:
     /// Updates the UI.
@@ -329,7 +419,13 @@ class Screen : public concurrency::OSThread
 
     bool isAUTOOled = false;
 
+    // Screen dimensions (for convenience)
+    // Defined during Screen::setup
+    uint16_t displayWidth = 0;
+    uint16_t displayHeight = 0;
+
   private:
+    FrameCallback alertFrames[1];
     struct ScreenCmd {
         Cmd cmd;
         union {
@@ -342,7 +438,7 @@ class Screen : public concurrency::OSThread
     bool enqueueCmd(const ScreenCmd &cmd)
     {
         if (!useDisplay)
-            return true; // claim success if our display is not in use
+            return false; // not enqueued if our display is not in use
         else {
             bool success = cmdQueue.enqueue(cmd, 0);
             enabled = true; // handle ASAP (we are the registered reader for cmdQueue, but might have been disabled)
@@ -351,17 +447,40 @@ class Screen : public concurrency::OSThread
     }
 
     // Implementations of various commands, called from doTask().
-    void handleSetOn(bool on);
+    void handleSetOn(bool on, FrameCallback einkScreensaver = NULL);
     void handleOnPress();
     void handleShowNextFrame();
     void handleShowPrevFrame();
-    void handleStartBluetoothPinScreen(uint32_t pin);
     void handlePrint(const char *text);
     void handleStartFirmwareUpdateScreen();
-    void handleShutdownScreen();
-    void handleRebootScreen();
-    /// Rebuilds our list of frames (screens) to default ones.
-    void setFrames();
+
+    // Info collected by setFrames method.
+    // Index location of specific frames. Used to apply the FrameFocus parameter of setFrames
+    struct FramesetInfo {
+        struct FramePositions {
+            uint8_t fault = 0;
+            uint8_t textMessage = 0;
+            uint8_t focusedModule = 0;
+            uint8_t log = 0;
+            uint8_t settings = 0;
+            uint8_t wifi = 0;
+        } positions;
+
+        uint8_t frameCount = 0;
+    } framesetInfo;
+
+    // Which frame we want to be displayed, after we regen the frameset by calling setFrames
+    enum FrameFocus : uint8_t {
+        FOCUS_DEFAULT,  // No specific frame
+        FOCUS_PRESERVE, // Return to the previous frame
+        FOCUS_FAULT,
+        FOCUS_TEXTMESSAGE,
+        FOCUS_MODULE, // Note: target module should call requestFocus(), otherwise no info about which module to focus
+    };
+
+    // Regenerate the normal set of frames, focusing a specific frame if requested
+    // Call when a frame should be added / removed, or custom frames should be cleared
+    void setFrames(FrameFocus focus = FOCUS_DEFAULT);
 
     /// Try to start drawing ASAP
     void setFastFramerate();
@@ -376,6 +495,30 @@ class Screen : public concurrency::OSThread
 
     static void drawDebugInfoWiFiTrampoline(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
 
+#ifdef T_WATCH_S3
+    static void drawAnalogClockFrame(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
+
+    static void drawDigitalClockFrame(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
+
+    static void drawSegmentedDisplayCharacter(OLEDDisplay *display, int x, int y, uint8_t number, float scale = 1);
+
+    static void drawHorizontalSegment(OLEDDisplay *display, int x, int y, int width, int height);
+
+    static void drawVerticalSegment(OLEDDisplay *display, int x, int y, int width, int height);
+
+    static void drawSegmentedDisplayColon(OLEDDisplay *display, int x, int y, float scale = 1);
+
+    static void drawWatchFaceToggleButton(OLEDDisplay *display, int16_t x, int16_t y, bool digitalMode = true, float scale = 1);
+
+    static void drawBluetoothConnectedIcon(OLEDDisplay *display, int16_t x, int16_t y);
+
+    // Whether we are showing the digital watch face or the analog one
+    bool digitalWatchFace = true;
+#endif
+
+    /// callback for current alert frame
+    FrameCallback alertFrame;
+
     /// Queue of commands to execute in doTask.
     TypedQueue<ScreenCmd> cmdQueue;
     /// Whether we are using a display
@@ -386,6 +529,11 @@ class Screen : public concurrency::OSThread
     // Bluetooth PIN screen)
     bool showingNormalScreen = false;
 
+    // Implementation to Adjust Brightness
+    uint8_t brightness = BRIGHTNESS_DEFAULT; // H = 254, MH = 192, ML = 130 L = 103
+
+    bool hasCompass = false;
+    float compassHeading;
     /// Holds state for debug information
     DebugInfo debugInfo;
 
@@ -397,4 +545,5 @@ class Screen : public concurrency::OSThread
 };
 
 } // namespace graphics
+
 #endif

@@ -27,7 +27,7 @@
 #if defined(DEBUG_HEAP_MQTT) && !MESHTASTIC_EXCLUDE_MQTT
 #include "mqtt/MQTT.h"
 #include "target_specific.h"
-#if !MESTASTIC_EXCLUDE_WIFI
+#if HAS_WIFI
 #include <WiFi.h>
 #endif
 #endif
@@ -50,7 +50,7 @@ RTC_NOINIT_ATTR uint64_t RTC_reg_b;
 
 esp_adc_cal_characteristics_t *adc_characs = (esp_adc_cal_characteristics_t *)calloc(1, sizeof(esp_adc_cal_characteristics_t));
 #ifndef ADC_ATTENUATION
-static const adc_atten_t atten = ADC_ATTEN_DB_11;
+static const adc_atten_t atten = ADC_ATTEN_DB_12;
 #else
 static const adc_atten_t atten = ADC_ATTENUATION;
 #endif
@@ -69,10 +69,14 @@ static const uint8_t ext_chrg_detect_value = EXT_CHRG_DETECT_VALUE;
 #endif
 #endif
 
-#if HAS_TELEMETRY && !defined(ARCH_PORTDUINO)
+#if HAS_TELEMETRY && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR && !defined(ARCH_PORTDUINO)
 INA260Sensor ina260Sensor;
 INA219Sensor ina219Sensor;
 INA3221Sensor ina3221Sensor;
+#endif
+
+#if HAS_RAKPROT && !defined(ARCH_PORTDUINO)
+RAK9154Sensor rak9154Sensor;
 #endif
 
 #ifdef HAS_PMU
@@ -145,6 +149,12 @@ class AnalogBatteryLevel : public HasBatteryLevel
      */
     virtual int getBatteryPercent() override
     {
+#if defined(HAS_RAKPROT) && !defined(ARCH_PORTDUINO) && !defined(HAS_PMU)
+        if (hasRAK()) {
+            return rak9154Sensor.getBusBatteryPercent();
+        }
+#endif
+
         float v = getBattVoltage();
 
         if (v < noBatVolt)
@@ -184,7 +194,13 @@ class AnalogBatteryLevel : public HasBatteryLevel
     virtual uint16_t getBattVoltage() override
     {
 
-#if defined(HAS_TELEMETRY) && !defined(ARCH_PORTDUINO) && !defined(HAS_PMU)
+#if defined(HAS_RAKPROT) && !defined(ARCH_PORTDUINO) && !defined(HAS_PMU)
+        if (hasRAK()) {
+            return getRAKVoltage();
+        }
+#endif
+
+#if HAS_TELEMETRY && !defined(ARCH_PORTDUINO) && !defined(HAS_PMU) && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
         if (hasINA()) {
             LOG_DEBUG("Using INA on I2C addr 0x%x for device battery voltage\n", config.power.device_battery_ina_address);
             return getINAVoltage();
@@ -216,14 +232,32 @@ class AnalogBatteryLevel : public HasBatteryLevel
             raw = espAdcRead();
             scaled = esp_adc_cal_raw_to_voltage(raw, adc_characs);
             scaled *= operativeAdcMultiplier;
-#else // block for all other platforms
+#else           // block for all other platforms
+#ifdef ADC_CTRL // enable adc voltage divider when we need to read
+            pinMode(ADC_CTRL, OUTPUT);
+            digitalWrite(ADC_CTRL, ADC_CTRL_ENABLED);
+            delay(10);
+#endif
             for (uint32_t i = 0; i < BATTERY_SENSE_SAMPLES; i++) {
                 raw += analogRead(BATTERY_PIN);
             }
             raw = raw / BATTERY_SENSE_SAMPLES;
             scaled = operativeAdcMultiplier * ((1000 * AREF_VOLTAGE) / pow(2, BATTERY_SENSE_RESOLUTION_BITS)) * raw;
+#ifdef ADC_CTRL // disable adc voltage divider when we need to read
+            digitalWrite(ADC_CTRL, !ADC_CTRL_ENABLED);
 #endif
-            last_read_value += (scaled - last_read_value) * 0.5; // Virtual LPF
+#endif
+
+            if (!initial_read_done) {
+                // Flush the smoothing filter with an ADC reading, if the reading is plausibly correct
+                if (scaled > last_read_value)
+                    last_read_value = scaled;
+                initial_read_done = true;
+            } else {
+                // Already initialized - filter this reading
+                last_read_value += (scaled - last_read_value) * 0.5; // Virtual LPF
+            }
+
             // LOG_DEBUG("battery gpio %d raw val=%u scaled=%u filtered=%u\n", BATTERY_PIN, raw, (uint32_t)(scaled), (uint32_t)
             // (last_read_value));
         }
@@ -325,13 +359,20 @@ class AnalogBatteryLevel : public HasBatteryLevel
     virtual bool isVbusIn() override
     {
 #ifdef EXT_PWR_DETECT
+#ifdef HELTEC_CAPSULE_SENSOR_V3
+        // if external powered that pin will be pulled down
+        if (digitalRead(EXT_PWR_DETECT) == LOW) {
+            return true;
+        }
+        // if it's not LOW - check the battery
+#else
         // if external powered that pin will be pulled up
         if (digitalRead(EXT_PWR_DETECT) == HIGH) {
             return true;
         }
         // if it's not HIGH - check the battery
 #endif
-
+#endif
         return getBattVoltage() > chargingVolt;
     }
 
@@ -339,6 +380,11 @@ class AnalogBatteryLevel : public HasBatteryLevel
     /// we can't be smart enough to say 'full'?
     virtual bool isCharging() override
     {
+#if defined(HAS_RAKPROT) && !defined(ARCH_PORTDUINO) && !defined(HAS_PMU)
+        if (hasRAK()) {
+            return (rak9154Sensor.isCharging()) ? OptTrue : OptFalse;
+        }
+#endif
 #ifdef EXT_CHRG_DETECT
         return digitalRead(EXT_CHRG_DETECT) == ext_chrg_detect_value;
 #else
@@ -357,10 +403,24 @@ class AnalogBatteryLevel : public HasBatteryLevel
     const float noBatVolt = (OCV[NUM_OCV_POINTS - 1] - 500) * NUM_CELLS;
     // Start value from minimum voltage for the filter to not start from 0
     // that could trigger some events.
+    // This value is over-written by the first ADC reading, it the voltage seems reasonable.
+    bool initial_read_done = false;
     float last_read_value = (OCV[NUM_OCV_POINTS - 1] * NUM_CELLS);
     uint32_t last_read_time_ms = 0;
 
-#if defined(HAS_TELEMETRY) && !defined(ARCH_PORTDUINO)
+#if defined(HAS_RAKPROT)
+
+    uint16_t getRAKVoltage() { return rak9154Sensor.getBusVoltageMv(); }
+
+    bool hasRAK()
+    {
+        if (!rak9154Sensor.isInitialized())
+            return rak9154Sensor.runOnce() > 0;
+        return rak9154Sensor.isRunning();
+    }
+#endif
+
+#if HAS_TELEMETRY && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR && !defined(ARCH_PORTDUINO)
     uint16_t getINAVoltage()
     {
         if (nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_INA219].first == config.power.device_battery_ina_address) {
@@ -389,6 +449,11 @@ class AnalogBatteryLevel : public HasBatteryLevel
             if (!ina260Sensor.isInitialized())
                 return ina260Sensor.runOnce() > 0;
             return ina260Sensor.isRunning();
+        } else if (nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_INA3221].first ==
+                   config.power.device_battery_ina_address) {
+            if (!ina3221Sensor.isInitialized())
+                return ina3221Sensor.runOnce() > 0;
+            return ina3221Sensor.isRunning();
         }
         return false;
     }
@@ -409,7 +474,11 @@ Power::Power() : OSThread("Power")
 bool Power::analogInit()
 {
 #ifdef EXT_PWR_DETECT
+#ifdef HELTEC_CAPSULE_SENSOR_V3
+    pinMode(EXT_PWR_DETECT, INPUT_PULLUP);
+#else
     pinMode(EXT_PWR_DETECT, INPUT);
+#endif
 #endif
 #ifdef EXT_CHRG_DETECT
     pinMode(EXT_CHRG_DETECT, ext_chrg_detect_mode);
@@ -500,12 +569,7 @@ void Power::shutdown()
 {
     LOG_INFO("Shutting down\n");
 
-#ifdef HAS_PMU
-    if (pmu_found == true) {
-        PMU->setChargingLedMode(XPOWERS_CHG_LED_OFF);
-        PMU->shutdown();
-    }
-#elif defined(ARCH_NRF52) || defined(ARCH_ESP32)
+#if defined(ARCH_NRF52) || defined(ARCH_ESP32)
 #ifdef PIN_LED1
     ledOff(PIN_LED1);
 #endif
@@ -548,14 +612,24 @@ void Power::readPowerStatus()
 #ifdef NRF_APM // Section of code detects USB power on the RAK4631 and updates the power states.  Takes 20 seconds or so to detect
                // changes.
 
+        static nrfx_power_usb_state_t prev_nrf_usb_state = (nrfx_power_usb_state_t)-1; // -1 so that state detected at boot
         nrfx_power_usb_state_t nrf_usb_state = nrfx_power_usbstatus_get();
 
-        if (nrf_usb_state == NRFX_POWER_USB_STATE_DISCONNECTED) {
-            powerFSM.trigger(EVENT_POWER_DISCONNECTED);
-            NRF_USB = OptFalse;
-        } else {
-            powerFSM.trigger(EVENT_POWER_CONNECTED);
-            NRF_USB = OptTrue;
+        // If state changed
+        if (nrf_usb_state != prev_nrf_usb_state) {
+            // If changed to DISCONNECTED
+            if (nrf_usb_state == NRFX_POWER_USB_STATE_DISCONNECTED) {
+                powerFSM.trigger(EVENT_POWER_DISCONNECTED);
+                NRF_USB = OptFalse;
+            }
+            // If changed to CONNECTED / READY
+            else {
+                powerFSM.trigger(EVENT_POWER_CONNECTED);
+                NRF_USB = OptTrue;
+            }
+
+            // Cache the current state
+            prev_nrf_usb_state = nrf_usb_state;
         }
 #endif
         // Notify any status instances that are observing us

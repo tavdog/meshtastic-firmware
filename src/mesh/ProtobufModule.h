@@ -13,6 +13,7 @@ template <class T> class ProtobufModule : protected SinglePortModule
     const pb_msgdesc_t *fields;
 
   public:
+    uint8_t numOnlineNodes = 0;
     /** Constructor
      * name is for debugging output
      */
@@ -61,6 +62,14 @@ template <class T> class ProtobufModule : protected SinglePortModule
         return sender;
     }
 
+    int handleStatusUpdate(const meshtastic::Status *arg)
+    {
+        if (arg->getStatusType() == STATUS_TYPE_NODE) {
+            numOnlineNodes = nodeStatus->getNumOnline();
+        }
+        return 0;
+    }
+
   private:
     /** Called to handle a particular incoming message
 
@@ -95,12 +104,11 @@ template <class T> class ProtobufModule : protected SinglePortModule
      */
     virtual void alterReceived(meshtastic_MeshPacket &mp) override
     {
-        auto &p = mp.decoded;
-
         T scratch;
         T *decoded = NULL;
         if (mp.which_payload_variant == meshtastic_MeshPacket_decoded_tag && mp.decoded.portnum == ourPortNum) {
             memset(&scratch, 0, sizeof(scratch));
+            auto &p = mp.decoded;
             if (pb_decode_from_bytes(p.payload.bytes, p.payload.size, fields, &scratch)) {
                 decoded = &scratch;
             } else {

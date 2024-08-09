@@ -28,6 +28,7 @@ void powerCommandsCheck()
         Serial1.end();
         if (screen)
             delete screen;
+        LOG_DEBUG("final reboot!\n");
         reboot();
 #else
         rebootAtMsec = -1;
@@ -37,7 +38,7 @@ void powerCommandsCheck()
 
 #if defined(ARCH_ESP32) || defined(ARCH_NRF52)
     if (shutdownAtMsec) {
-        screen->startShutdownScreen();
+        screen->startAlert("Shutting down...");
     }
 #endif
 

@@ -392,6 +392,8 @@ ExternalNotificationModule::ExternalNotificationModule()
         display.setFont(&FreeMonoBold12pt7b);
         display.setTextColor(EPD_BLACK);
         display.setCursor(2, 16);
+        if (strlen(devicestate.owner.long_name) < 9)
+            display.setCursor(115, 50); // set short name lower inline with the windsock
         display.print(devicestate.owner.long_name);
         display.display();
         LOG_INFO("DID EPD");
@@ -653,7 +655,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
     display.clearBuffer();
     auto &p = mp.decoded;
-    static char msg[70];
+    char msg[70] = "";
     sprintf(msg, "%s", p.payload.bytes);
     if (strcmp(msg, last_data) == 0)
         return; // don't re-display duplicate info

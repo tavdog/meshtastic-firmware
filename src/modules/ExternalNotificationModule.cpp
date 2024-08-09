@@ -735,6 +735,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     display.setFont(&FreeMonoBold12pt7b);
     display.setCursor(180, 18 + y_offset);
     display.setTextColor(EPD_BLACK);
+    display.setTextWrap(false);
     display.print(timeBuffer);
 
     // display.setFont(&FreeMonoBold12pt7b);

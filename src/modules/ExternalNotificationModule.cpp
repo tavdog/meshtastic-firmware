@@ -24,7 +24,6 @@
 #include "mesh/generated/meshtastic/rtttl.pb.h"
 #include <Arduino.h>
 
-#include "Adafruit_ThinkInk.h"
 #include "graphics/img/epd_img.h"
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include <Fonts/FreeMonoBold18pt7b.h>
@@ -32,8 +31,19 @@
 #include <Fonts/FreeMonoBold9pt7b.h>
 
 #ifdef OLD_EPD
+#include "Adafruit_ThinkInk.h"
 Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
+#elif defined(LILYGOT5)
+#include <GxDEPG0213BN/GxDEPG0213BN.h>
+#include <GxIO/GxIO.h>
+#include <GxIO/GxIO_SPI/GxIO_SPI.h>
+#define display() update()
+#define clearBuffer() fillScreen(GxEPD_WHITE)
+#define EPD_BLACK GxEPD_BLACK
+GxIO_Class m_io = GxIO_Class(SPI, EPD_CS, EPD_DC, EPD_RSET);
+GxEPD_Class display = GxEPD_Class(m_io, EPD_RSET, EPD_BUSY);
 #else
+#include "Adafruit_ThinkInk.h"
 ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
 #endif
 
@@ -373,20 +383,25 @@ ExternalNotificationModule::ExternalNotificationModule()
         SPI.begin(EPD_SCK, EPD_MISO, EPD_MOSI, EPD_CS);
 
         LOG_INFO("DOING WINDYTRON_LOGO");
-        // startup the epd
+// startup the epd
+#ifndef LILYGOT5
         display.begin();
         display.clearBuffer();
-
+        const int rc = 0; // rotation correction
+#else
+        display.init();
+        const int rc = 1;
+#endif
         if (!config.display.flip_screen) {
-            display.setRotation(1);
+            display.setRotation(1 + rc);
         } else {
-            display.setRotation(3);
+            display.setRotation(3 + rc);
         }
-        display.drawBitmap(-10, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);
+        display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);
         if (!config.display.flip_screen) {
-            display.setRotation(2);
+            display.setRotation(2 + rc);
         } else {
-            display.setRotation(0);
+            display.setRotation(0 + rc);
         }
 
         display.setFont(&FreeMonoBold12pt7b);
@@ -395,7 +410,11 @@ ExternalNotificationModule::ExternalNotificationModule()
         if (strlen(devicestate.owner.long_name) < 9)
             display.setCursor(115, 50); // set short name lower inline with the windsock
         display.print(devicestate.owner.long_name);
+        // #ifndef LILYGOT5
         display.display();
+        // #else
+        // display.update()
+        // #endif
         LOG_INFO("DID EPD");
 
         if (!nodeDB->loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),

@@ -8,6 +8,17 @@
 #define EPD_MOSI 18
 #define EPD_CS 15
 #define EPD_DC 33
+#define LILYGOT5
+#elif defined(LILYGOT5)
+// pins for lilygo t5 2.13
+#define EPD_MOSI (23)
+#define EPD_MISO (-1)
+#define EPD_SCK (18)
+#define EPD_CS (5)
+
+#define EPD_BUSY (4)
+#define EPD_RSET (16)
+#define EPD_DC (17)
 
 #else
 #define EPD_SCK 18

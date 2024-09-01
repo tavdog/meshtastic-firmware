@@ -728,9 +728,13 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     } else {
         // DISPLAY LABEL normall but shorten if too long TODO
         display.setFont(&FreeMonoBold12pt7b);
-        display.setCursor(84, 16);
+        display.setCursor(75, 16);
         display.setTextColor(EPD_BLACK);
-        display.print(devicestate.owner.short_name); // maximum 6
+        if (strlen(devicestate.owner.long_name) < 9) {
+            display.print(devicestate.owner.long_name); // maximum 6
+        } else {
+            display.print(devicestate.owner.short_name); // maximum 6
+        }
     }
     // DISPLAY THE TIMESTAMP
     // Find the position of the 'T' character

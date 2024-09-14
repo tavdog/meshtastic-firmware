@@ -22,30 +22,36 @@
 #include "configuration.h"
 #include "main.h"
 #include "mesh/generated/meshtastic/rtttl.pb.h"
+#include <AXS15231B.h>
 #include <Arduino.h>
 
-#include "graphics/img/epd_img.h"
+#include "FreeArial9full.h"
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include <Fonts/FreeMonoBold18pt7b.h>
 #include <Fonts/FreeMonoBold24pt7b.h>
 #include <Fonts/FreeMonoBold9pt7b.h>
 
-#ifdef OLD_EPD
-#include "Adafruit_ThinkInk.h"
-Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
-#elif defined(LILYGOT5)
-#include <GxDEPG0213BN/GxDEPG0213BN.h>
-#include <GxIO/GxIO.h>
-#include <GxIO/GxIO_SPI/GxIO_SPI.h>
-#define display() update()
-#define clearBuffer() fillScreen(GxEPD_WHITE)
-#define EPD_BLACK GxEPD_BLACK
-GxIO_Class m_io = GxIO_Class(SPI, EPD_CS, EPD_DC, EPD_RSET);
-GxEPD_Class display = GxEPD_Class(m_io, EPD_RSET, EPD_BUSY);
-#else
-#include "Adafruit_ThinkInk.h"
-ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
-#endif
+TFT_eSPI m_lcd = TFT_eSPI(640, 180);
+TFT_eSprite m_sprite = TFT_eSprite(m_io);
+
+// axs15231_init();
+
+// #ifdef OLD_EPD
+// #include "Adafruit_ThinkInk.h"
+// Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
+// #elif defined(LILYGOT5)
+// #include <GxDEPG0213BN/GxDEPG0213BN.h>
+// #include <GxIO/GxIO.h>
+// #include <GxIO/GxIO_SPI/GxIO_SPI.h>
+// #define display() update()
+// #define clearBuffer() fillScreen(GxEPD_WHITE)
+// #define EPD_BLACK GxEPD_BLACK
+// GxIO_Class m_io = GxIO_Class(SPI, EPD_CS, EPD_DC, EPD_RSET);
+// GxEPD_Class display = GxEPD_Class(m_io, EPD_RSET, EPD_BUSY);
+// #else
+// #include "Adafruit_ThinkInk.h"
+// ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
+// #endif
 
 #ifdef HAS_NCP5623
 #include <graphics/RAKled.h>
@@ -358,64 +364,58 @@ ExternalNotificationModule::ExternalNotificationModule()
     */
 
     moduleConfig.external_notification.alert_message = true;
-    // moduleConfig.external_notification.alert_message_buzzer = true;
-    // moduleConfig.external_notification.alert_message_vibra = true;
-    // moduleConfig.external_notification.use_i2s_as_buzzer = true;
 
     moduleConfig.external_notification.active = true;
-    // moduleConfig.external_notification.alert_bell = 1;
-    // moduleConfig.external_notification.output_ms = 1000;
-    // moduleConfig.external_notification.output = 4; // RAK4631 IO4
-    // moduleConfig.external_notification.output_buzzer = 10; // RAK4631 IO6
-    // moduleConfig.external_notification.output_vibra = 28; // RAK4631 IO7
-    // moduleConfig.external_notification.nag_timeout = 300;
-
-    // T-Watch / T-Deck i2s audio as buzzer:
-    // moduleConfig.external_notification.enabled = true;
-    // moduleConfig.external_notification.nag_timeout = 300;
-    // moduleConfig.external_notification.output_ms = 1000;
-    // moduleConfig.external_notification.use_i2s_as_buzzer = true;
-    // moduleConfig.external_notification.alert_message_buzzer = true;
 
     if (moduleConfig.external_notification.enabled) {
 
-        SPI.end();
-        SPI.begin(EPD_SCK, EPD_MISO, EPD_MOSI, EPD_CS);
+        // SPI.end();
+        // SPI.begin(EPD_SCK, EPD_MISO, EPD_MOSI, EPD_CS);
+        axs15231_init();
 
         LOG_INFO("DOING WINDYTRON_LOGO");
-// startup the epd
-#ifndef LILYGOT5
-        display.begin();
-        display.clearBuffer();
-        const int rc = 0; // rotation correction
-#else
-        display.init();
-        const int rc = 1;
-#endif
-        if (!config.display.flip_screen) {
-            display.setRotation(1 + rc);
-        } else {
-            display.setRotation(3 + rc);
-        }
-        display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);
-        if (!config.display.flip_screen) {
-            display.setRotation(2 + rc);
-        } else {
-            display.setRotation(0 + rc);
-        }
+        pinMode(TFT_BL, OUTPUT);
+        digitalWrite(TFT_BL, LOW); // turn off backlight asap to minimise power on artifacts
 
-        display.setFont(&FreeMonoBold12pt7b);
-        display.setTextColor(EPD_BLACK);
-        display.setCursor(2, 16);
-        if (strlen(devicestate.owner.long_name) < 9)
-            display.setCursor(115, 50); // set short name lower inline with the windsock
-        display.print(devicestate.owner.long_name);
-        // #ifndef LILYGOT5
-        display.display();
-        // #else
-        // display.update()
-        // #endif
-        LOG_INFO("DID EPD");
+        // lcd_setRotation(2);             // 180 degree hardware rotate if you want reset / boot buttons at the bottom
+        m_sprite.createSprite(640, 180); // full screen landscape sprite in psram
+        m_sprite.setSwapBytes(1);
+        lcd_fill(0, 0, 180, 640, 0x00); // clear screen
+        digitalWrite(TFT_BL, HIGH);     // turn on backlight
+
+        m_config.m_display_hw = "tftlong";
+
+        // m_sprite.setRotation(1); // for upside down
+        // logo("blah","blah
+        lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)&gImage);
+        delay(3000);
+        already_run = true;
+        LOG_INFO("out of setup");
+
+        // if (!config.display.flip_screen) {
+        //     display.setRotation(1 + rc);
+        // } else {
+        //     display.setRotation(3 + rc);
+        // }
+        // display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);
+        // if (!config.display.flip_screen) {
+        //     display.setRotation(2 + rc);
+        // } else {
+        //     display.setRotation(0 + rc);
+        // }
+
+        // display.setFont(&FreeMonoBold12pt7b);
+        // display.setTextColor(EPD_BLACK);
+        // display.setCursor(2, 16);
+        // if (strlen(devicestate.owner.long_name) < 9)
+        //     display.setCursor(115, 50); // set short name lower inline with the windsock
+        // display.print(devicestate.owner.long_name);
+        // // #ifndef LILYGOT5
+        // display.display();
+        // // #else
+        // // display.update()
+        // // #endif
+        // LOG_INFO("DID EPD");
 
         if (!nodeDB->loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),
                                &meshtastic_RTTTLConfig_msg, &rtttlConfig)) {
@@ -680,8 +680,10 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         return; // don't re-display duplicate info
     strcpy(last_data, msg);
 
-    // parse the wind string
+    // single style
     // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07
+    // dual style
+    // 16:10 NE 51 20g25 , AUX1_AUX2 -- E 91 30g35 , AUX21_AUX22
     char data[70]; // Adjust the size according to your needs
 
     // Copy the content of msg to data

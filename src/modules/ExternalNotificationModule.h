@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SinglePortModule.h"
+#include "TFT_eSPI.h"
 #include "concurrency/OSThread.h"
 #include "configuration.h"
 #if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
@@ -71,3 +72,5 @@ class ExternalNotificationModule : public SinglePortModule, private concurrency:
 };
 
 extern ExternalNotificationModule *externalNotificationModule;
+
+#include "/data/windy_tron_640x180_water.c"

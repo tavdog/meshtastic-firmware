@@ -73,4 +73,4 @@ class ExternalNotificationModule : public SinglePortModule, private concurrency:
 
 extern ExternalNotificationModule *externalNotificationModule;
 
-#include "/data/windy_tron_640x180_water.c"
+#include "../../data/windy_tron_640x180_water.c"

@@ -28,23 +28,6 @@
 TFT_eSPI m_lcd = TFT_eSPI(640, 180);
 TFT_eSprite m_sprite = TFT_eSprite(&m_lcd);
 
-// #ifdef OLD_EPD
-// #include "Adafruit_ThinkInk.h"
-// Adafruit_SSD1675 display = Adafruit_SSD1675(250, 122, EPD_DC, -1, EPD_CS, -1, -1);
-// #elif defined(LILYGOT5)
-// #include <GxDEPG0213BN/GxDEPG0213BN.h>
-// #include <GxIO/GxIO.h>
-// #include <GxIO/GxIO_SPI/GxIO_SPI.h>
-// #define display() update()
-// #define clearBuffer() fillScreen(GxEPD_WHITE)
-// #define EPD_BLACK GxEPD_BLACK
-// GxIO_Class m_io = GxIO_Class(SPI, EPD_CS, EPD_DC, EPD_RSET);
-// GxEPD_Class display = GxEPD_Class(m_io, EPD_RSET, EPD_BUSY);
-// #else
-// #include "Adafruit_ThinkInk.h"
-// ThinkInk_213_Mono_BN display = ThinkInk_213_Mono_BN(EPD_DC, -1, EPD_CS, -1, -1);
-// #endif
-
 #ifdef HAS_NCP5623
 #include <graphics/RAKled.h>
 #endif
@@ -378,11 +361,9 @@ ExternalNotificationModule::ExternalNotificationModule()
         m_sprite.setCursor(75, 16);
         m_sprite.print(devicestate.owner.long_name); // maximum 6
         lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
-        // m_sprite.setRotation(1); // for upside down
-        // logo("blah","blah
         lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)&gImage);
         delay(3000);
-        LOG_INFO("out of setup");
+        LOG_INFO("DONE WINDYTRON_LOGO");
 
         // if (!config.m_sprite.flip_screen) {
         //     m_sprite.setRotation(1 + rc);
@@ -395,19 +376,6 @@ ExternalNotificationModule::ExternalNotificationModule()
         // } else {
         //     m_sprite.setRotation(0 + rc);
         // }
-
-        // m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-        // m_sprite.setTextColor(EPD_BLACK);
-        // m_sprite.setCursor(2, 16);
-        // if (strlen(devicestate.owner.long_name) < 9)
-        //     m_sprite.setCursor(115, 50); // set short name lower inline with the windsock
-        // m_sprite.print(devicestate.owner.long_name);
-        // // #ifndef LILYGOT5
-        // m_sprite.display();
-        // // #else
-        // // m_sprite.update()
-        // // #endif
-        // LOG_INFO("DID EPD");
 
         if (!nodeDB->loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),
                                &meshtastic_RTTTLConfig_msg, &rtttlConfig)) {
@@ -661,11 +629,20 @@ void ExternalNotificationModule::handleSetRingtone(const char *from_msg)
     }
 }
 
+#define SMALL &FreeMonoBold9pt7b
+#define MEDIUM &FreeSansBold12pt7b
+#define MEDLAR &FreeSansBold18pt7b
+#define LARGE &FreeSansBold24pt7b
+#define gray 0x6B6D
+#define blue 0x0AAD
+#define orange 0xC260
+#define purple 0x604D
+#define green 0x1AE9
 void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 {
 
     // m_sprite.clearBuffer();
-    lcd_fill(0, 0, 180, 640, 0x00);
+    // lcd_fill(0, 0, 180, 640, 0x00);
     auto &p = mp.decoded;
     char msg[70] = "";
     sprintf(msg, "%s", p.payload.bytes);
@@ -712,6 +689,9 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         aux2[23] = '\0'; // Null-terminate the aux2 string
     }
 
+    // clear the sprite
+    m_sprite.fillSprite(TFT_BLACK);
+
     int y_offset = 0;
     // we can move all fields down and display a long label at the very top.
     if (aux2[0] == '.') {
@@ -723,9 +703,9 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     } else {
         // DISPLAY LABEL normall but shorten if too long TODO
         m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-        m_sprite.setCursor(75, 16);
+        m_sprite.setCursor(250, 16);
         // m_sprite.setTextColor(EPD_BLACK);
-        if (strlen(devicestate.owner.long_name) < 9) {
+        if (strlen(devicestate.owner.long_name) < 25) {
             m_sprite.print(devicestate.owner.long_name); // maximum 6
         } else {
             m_sprite.print(devicestate.owner.short_name); // maximum 6
@@ -740,9 +720,6 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         // Move one position ahead to point to the start of the time (hour)
         timeStart += 1;
 
-        // Create a buffer to store the time
-        char timeBuffer[6];
-
         // Copy the time to the buffer
         strncpy(timeBuffer, timeStart, 5);
 
@@ -750,66 +727,81 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         timeBuffer[5] = '\0';
     }
 
-    m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-    m_sprite.setCursor(180, 18 + y_offset);
-    // m_sprite.setTextColor(EPD_BLACK);
+    m_sprite.setFreeFont(MEDIUM);
+    m_sprite.setCursor(570, 19);
     m_sprite.setTextWrap(false);
     m_sprite.print(timeBuffer);
 
-    // m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-    // m_sprite.setCursor(85, 16);
-    // m_sprite.setTextColor(EPD_BLACK);
-    // m_sprite.print(s);
-
     // DISPLAY VELOCITY
-    m_sprite.setFreeFont(&FreeMonoBold24pt7b);
-    m_sprite.setCursor(60, 60 + y_offset);
-    // m_sprite.setTextColor(EPD_BLACK);
-    m_sprite.print(avg_g_gust);
-    m_sprite.setFreeFont(&FreeMonoBold9pt7b);
+    // m_sprite.print(avg_g_gust);
+    if (avg < 15)
+        m_sprite.setTextColor(TFT_BLUE);
+    if (avg >= 15)
+        m_sprite.setTextColor(TFT_CYAN);
+    if (avg >= 25)
+        m_sprite.setTextColor(TFT_GREEN);
+    if (avg >= 30)
+        m_sprite.setTextColor(TFT_MAGENTA);
+    if (avg >= 35)
+        m_sprite.setTextColor(TFT_RED);
+    int y = 150;
+    // if (m_data->get("aux1").length() <= 1) y += 25;
+    m_sprite.setCursor(270, y);
+    m_sprite.setFreeFont(LARGE);
+    m_sprite.setTextSize(3);
+    m_sprite.print(avg);
+    m_sprite.setFreeFont(&FreeSans12pt7b);
+    m_sprite.print('g');
+    m_sprite.setFreeFont(LARGE);
+    m_sprite.print(gust);
 
     // DISPLAY DIR
-    m_sprite.setFreeFont(&FreeMonoBold18pt7b);
-    m_sprite.setCursor(5, 30 + y_offset);
-    // m_sprite.setTextColor(EPD_BLACK);
+    // m_sprite.print(dir);
+    // m_sprite.setCursor(5, 60 + y_offset);
+    // m_sprite.print(degree);
+    y = 60;
+    // if (m_data->get("aux1").length() <= 1) y += 25;
+    // if (m_config->gets("api_data_url").indexOf("maui") > -1 || m_config->gets("color_profile").equals("Maui") ) {
+    m_sprite.setTextColor(TFT_RED);
+    if (dir == "N")
+        m_sprite.setTextColor(TFT_CYAN);
+    if (dir == "NE")
+        m_sprite.setTextColor(TFT_GREEN);
+    if (dir == "ENE")
+        m_sprite.setTextColor(TFT_YELLOW);
+    // } else {
+    // 	m_sprite.setTextColor(TFT_GREEN);
+    // }
+    m_sprite.setFreeFont(LARGE);
+    m_sprite.setTextSize(1);
+    m_sprite.setCursor(5, y);
     m_sprite.print(dir);
-    m_sprite.setCursor(5, 60 + y_offset);
-    m_sprite.print(degree);
+    m_sprite.print(" ");
+    // m_sprite.setCursor(5,y+45);
+    m_sprite.print(degree); // for now we'll use * for degree symbol
+    // m_sprite.setFreeFont(&FreeArial9full);
+    m_sprite.setCursor(m_sprite.getCursorX(), m_sprite.getCursorY() - 10);
+    m_sprite.setTextSize(2);
+    m_sprite.print("°");
 
     // DISPLAY AUX1
-    m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-    m_sprite.setCursor(10, 90 + y_offset);
-    // m_sprite.setTextColor(EPD_BLACK);
+    // m_sprite.print(aux1);
+    m_sprite.setTextColor(TFT_GREENYELLOW);
+    m_sprite.setFreeFont(MEDIUM);
+    m_sprite.setTextSize(1);
+    m_sprite.setCursor(10, 120);
     m_sprite.print(aux1);
 
     //  DISPLAY AUX2
-    m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-    m_sprite.setCursor(10, 117 + y_offset);
-    // m_sprite.setTextColor(EPD_BLACK);
+    // m_sprite.print(aux2);
+    m_sprite.setTextColor(TFT_CYAN);
+    m_sprite.setFreeFont(MEDIUM);
+    m_sprite.setTextSize(1);
+    m_sprite.setCursor(10, 160);
     m_sprite.print(aux2);
 
     // m_sprite.display();
     lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
-
-    // void show_data(String data)  {
-    //   // parse the message as json
-    //   if (last_message.equals(data)) return;
-    //   StaticJsonDocument<512> doc;
-    //   deserializeJson(doc, data.c_str());
-    //   // json data looks like : {"avg": 7, "gust": 10, "lull": 4, "dir_card": "WSW", "dir_deg": 257, "stamp":
-    //   "2023-10-21T20:37:44", "aux1": "2.6f,10s,N357", "aux2": "0907H2.2", "label": "Kanaha"} m_sprite.clearBuffer(); String
-    //   stamp = doc["stamp"]; String hour = stamp.substring(stamp.indexOf('T')+1,stamp.indexOf(':')); String min =
-    //   stamp.substring(stamp.indexOf(':')+1,stamp.indexOf(':')+3); String avg_g_gust = String(doc["avg"]) + "g" +
-    //   String(doc["gust"]); display_location(String(doc["label"]));
-
-    //   display_dir(doc["dir_card"],doc["dir_deg"]);
-    //   display_vel(avg_g_gust);
-    //   display_time(min.toInt(),hour.toInt());
-    //   display_aux1(doc["aux1"]);
-    //   display_aux2(doc["aux2"]);
-    //   m_sprite.display();
-    //   last_message = String(data);
-    // }
 }
 void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
 {

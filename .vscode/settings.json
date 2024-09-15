@@ -6,6 +6,6 @@
   "files.trimFinalNewlines": false,
   "cmake.configureOnOpen": false,
   "[cpp]": {
-    "editor.defaultFormatter": "trunk.io"
+    "editor.defaultFormatter": "ms-vscode.cpptools"
   }
 }

@@ -1,7 +1,9 @@
 /*
 Board Information: https://wiki.uniteng.com/en/meshtastic/station-g2
 */
-
+#define SIMULATE_LORA 1
+#define HAS_GPS 0
+#define MESHTASTIC_EXCLUDE_SCREEN 1
 // Station G2 may not have GPS installed, but it has a GROVE GPS Socket for Optional GPS Module
 #define GPS_RX_PIN 7
 #define GPS_TX_PIN 15
@@ -9,8 +11,10 @@ Board Information: https://wiki.uniteng.com/en/meshtastic/station-g2
 // Station G2 has 1.3 inch OLED Screen
 #define USE_SH1107_128_64
 
-#define I2C_SDA 5 // I2C pins for this board
-#define I2C_SCL 6
+// #define I2C_SDA 5 // I2C pins for this board
+// #define I2C_SCL 6
+#define I2C_SDA -1 // I2C pins for this board
+#define I2C_SCL -1
 
 #define BUTTON_PIN 38 // This is the Program Button
 #define BUTTON_NEED_PULLUP

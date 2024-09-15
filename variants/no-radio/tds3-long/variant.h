@@ -1,5 +1,4 @@
 #define SIMULATE_LORA 1
-
 #define HAS_GPS 0
 
 // For OLED LCD

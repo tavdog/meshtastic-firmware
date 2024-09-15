@@ -372,9 +372,12 @@ ExternalNotificationModule::ExternalNotificationModule()
         // lcd_setRotation(2);             // 180 degree hardware rotate if you want reset / boot buttons at the bottom
         m_sprite.createSprite(640, 180); // full screen landscape sprite in psram
         m_sprite.setSwapBytes(1);
-        lcd_fill(0, 0, 180, 640, 0x00); // clear screen
-        digitalWrite(TFT_BL, HIGH);     // turn on backlight
-
+        // lcd_fill(0, 0, 180, 640, 0x00); // clear screen
+        digitalWrite(TFT_BL, HIGH); // turn on backlight
+        m_sprite.setFreeFont(&FreeMonoBold12pt7b);
+        m_sprite.setCursor(75, 16);
+        m_sprite.print(devicestate.owner.long_name); // maximum 6
+        lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
         // m_sprite.setRotation(1); // for upside down
         // logo("blah","blah
         lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)&gImage);

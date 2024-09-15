@@ -25,16 +25,8 @@
 #include <AXS15231B.h>
 #include <Arduino.h>
 
-// #include "FreeArial9full.h"
-// #include <Fonts/FreeMonoBold12pt7b.h>
-// #include <Fonts/FreeMonoBold18pt7b.h>
-// #include <Fonts/FreeMonoBold24pt7b.h>
-// #include <Fonts/FreeMonoBold9pt7b.h>
-
 TFT_eSPI m_lcd = TFT_eSPI(640, 180);
 TFT_eSprite m_sprite = TFT_eSprite(&m_lcd);
-
-// axs15231_init();
 
 // #ifdef OLD_EPD
 // #include "Adafruit_ThinkInk.h"

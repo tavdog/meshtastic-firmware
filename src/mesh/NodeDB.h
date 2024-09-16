@@ -39,7 +39,7 @@ uint32_t sinceLastSeen(const meshtastic_NodeInfoLite *n);
 uint32_t sinceReceived(const meshtastic_MeshPacket *p);
 
 enum LoadFileResult {
-    // Successfully opened the file
+    // Successfully opened the files
     SUCCESS = 1,
     // File does not exist
     NOT_FOUND = 2,

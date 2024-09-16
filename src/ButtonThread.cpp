@@ -134,7 +134,7 @@ int32_t ButtonThread::runOnce()
             channels.cycleMqttDownlink();
 
             nodeDB->saveChannelsToDisk();
-
+            externalNotificationModule->displayText("Please wait...");
             rebootAtMsec = 1;
 
 #endif

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "SinglePortModule.h"
-#include "TFT_eSPI.h"
 #include "concurrency/OSThread.h"
 #include "configuration.h"
 #if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
@@ -46,6 +45,7 @@ class ExternalNotificationModule : public SinglePortModule, private concurrency:
 
     void handleGetRingtone(const meshtastic_MeshPacket &req, meshtastic_AdminMessage *response);
     void handleSetRingtone(const char *from_msg);
+    void displayText(const String msg);
 
   protected:
     /** Called to handle a particular incoming message
@@ -68,7 +68,6 @@ class ExternalNotificationModule : public SinglePortModule, private concurrency:
                                                                  meshtastic_AdminMessage *response) override;
 
     void displayWind(const meshtastic_MeshPacket &mp);
-    void displayText(const meshtastic_MeshPacket &mp);
 };
 
 extern ExternalNotificationModule *externalNotificationModule;

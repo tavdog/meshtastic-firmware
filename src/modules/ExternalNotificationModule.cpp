@@ -22,9 +22,10 @@
 #include "configuration.h"
 #include "main.h"
 #include "mesh/generated/meshtastic/rtttl.pb.h"
-#include <AXS15231B.h>
 #include <Arduino.h>
 
+#include <AXS15231B.h>
+#include <TFT_eSPI.h>
 TFT_eSPI m_lcd = TFT_eSPI(640, 180);
 TFT_eSprite m_sprite = TFT_eSprite(&m_lcd);
 
@@ -346,6 +347,8 @@ ExternalNotificationModule::ExternalNotificationModule()
 
     if (moduleConfig.external_notification.enabled) {
 
+        // m_lcd = TFT_eSPI(640, 180);
+        // m_sprite = TFT_eSprite(&m_lcd);
         axs15231_init();
 
         LOG_INFO("DOING WINDYTRON_LOGO");
@@ -503,8 +506,8 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                     displayWind(mp);
                     return ProcessMessage::STOP; // Just display and then stop.
                 } else {
-                    LOG_INFO("DISPLAY_TEXT");
-                    displayText(mp);
+                    // LOG_INFO("DISPLAY_TEXT");
+                    // displayText(mp);
                 }
 
                 isNagging = true;
@@ -789,17 +792,17 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     // m_sprite.display();
     lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
 }
-void ExternalNotificationModule::displayText(const meshtastic_MeshPacket &mp)
+void ExternalNotificationModule::displayText(const String msg)
 {
 
     // m_sprite.clearBuffer();
-    lcd_fill(0, 0, 180, 640, 0x00);
-    auto &p = mp.decoded;
-    static char msg[256];
-    sprintf(msg, "%s", p.payload.bytes);
-    if (strcmp(msg, last_data) == 0)
-        return; // don't re-display duplicate info
-    strcpy(last_data, msg);
+    // lcd_fill(0, 0, 180, 640, 0x00);
+    // auto &p = mp.decoded;
+    // static char msg[256];
+    // sprintf(msg, "%s", p.payload.bytes);
+    // if (strcmp(msg, last_data) == 0)
+    //     return; // don't re-display duplicate info
+    // strcpy(last_data, msg);
 
     // parse the wind string
     // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07

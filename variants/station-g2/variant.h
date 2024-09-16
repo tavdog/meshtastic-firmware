@@ -16,8 +16,8 @@ Board Information: https://wiki.uniteng.com/en/meshtastic/station-g2
 #define I2C_SDA -1 // I2C pins for this board
 #define I2C_SCL -1
 
-#define BUTTON_PIN 38 // This is the Program Button
-#define BUTTON_NEED_PULLUP
+#define BUTTON_PIN 0 // This is the Program Button
+// #define BUTTON_NEED_PULLUP
 
 #define USE_SX1262
 

@@ -342,40 +342,26 @@ ExternalNotificationModule::ExternalNotificationModule()
 
     moduleConfig.external_notification.active = true;
 
+    moduleConfig.external_notification.enabled = true;
+
     if (moduleConfig.external_notification.enabled) {
 
-        // SPI.end();
-        // SPI.begin(EPD_SCK, EPD_MISO, EPD_MOSI, EPD_CS);
         axs15231_init();
 
         LOG_INFO("DOING WINDYTRON_LOGO");
         pinMode(TFT_BL, OUTPUT);
         digitalWrite(TFT_BL, LOW); // turn off backlight asap to minimise power on artifacts
 
-        // lcd_setRotation(2);             // 180 degree hardware rotate if you want reset / boot buttons at the bottom
         m_sprite.createSprite(640, 180); // full screen landscape sprite in psram
         m_sprite.setSwapBytes(1);
-        // lcd_fill(0, 0, 180, 640, 0x00); // clear screen
         digitalWrite(TFT_BL, HIGH); // turn on backlight
-        m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-        m_sprite.setCursor(75, 16);
-        m_sprite.print(devicestate.owner.long_name); // maximum 6
-        lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
+        // m_sprite.setFreeFont(&FreeMonoBold12pt7b);
+        // m_sprite.setCursor(75, 16);
+        // m_sprite.print(devicestate.owner.long_name); // maximum 6
+        // lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
         lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)&gImage);
-        delay(3000);
+        // delay(3000);
         LOG_INFO("DONE WINDYTRON_LOGO");
-
-        // if (!config.m_sprite.flip_screen) {
-        //     m_sprite.setRotation(1 + rc);
-        // } else {
-        //     m_sprite.setRotation(3 + rc);
-        // }
-        // m_sprite.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);
-        // if (!config.m_sprite.flip_screen) {
-        //     m_sprite.setRotation(2 + rc);
-        // } else {
-        //     m_sprite.setRotation(0 + rc);
-        // }
 
         if (!nodeDB->loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),
                                &meshtastic_RTTTLConfig_msg, &rtttlConfig)) {

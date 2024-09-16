@@ -331,3 +331,35 @@ int16_t Channels::setActiveByIndex(ChannelIndex channelIndex)
 {
     return setCrypto(channelIndex);
 }
+
+void Channels::cycleMqttDownlink()
+{
+    int currentChannelIndex = -1;
+
+    // Step 1: Find the channel that currently has MQTT downlink enabled
+    for (int i = 0; i < getNumChannels(); i++) {
+        meshtastic_Channel &ch = getByIndex(i);
+
+        if (ch.role != meshtastic_Channel_Role_DISABLED && ch.has_settings) {
+            if (ch.settings.downlink_enabled) { // Assuming 'downlink_enabled' is the flag for MQTT downlink
+                currentChannelIndex = i;
+
+                // Disable MQTT downlink for this channel
+                ch.settings.downlink_enabled = false;
+                LOG_DEBUG("Disabled MQTT downlink for channel %d\n", i);
+
+                meshtastic_Channel &next_ch = getByIndex(i + 1);
+                if (next_ch.role != meshtastic_Channel_Role_DISABLED && next_ch.has_settings) {
+                    next_ch.settings.downlink_enabled = true;
+                    LOG_DEBUG("Enabled MQTT downlink for channel %d\n", i + 1);
+                } else {
+                    meshtastic_Channel &first_ch = getByIndex(0);
+                    first_ch.settings.downlink_enabled = true;
+                    LOG_DEBUG("Enabled MQTT downlink for channel %d\n", 0);
+                }
+
+                break;
+            }
+        }
+    }
+}

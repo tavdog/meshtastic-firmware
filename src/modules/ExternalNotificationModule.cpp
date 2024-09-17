@@ -630,8 +630,6 @@ void ExternalNotificationModule::handleSetRingtone(const char *from_msg)
 void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 {
 
-    // m_sprite.clearBuffer();
-    // lcd_fill(0, 0, 180, 640, 0x00);
     auto &p = mp.decoded;
     char msg[70] = "";
     sprintf(msg, "%s", p.payload.bytes);
@@ -639,155 +637,313 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         return; // don't re-display duplicate info
     strcpy(last_data, msg);
 
-    // single style
-    // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07
-    // dual style
-    // 16:10 NE 51 20g25 , AUX1_AUX2 -- E 91 30g35 , AUX21_AUX22
-    char data[70]; // Adjust the size according to your needs
+    String s = String(msg);
+    String parts[20];
+    if (s.indexOf("DUALWIND") > -1) { // WE HAVE DUALWIND, PARSE TSV
+        int maxParts = 20;
+        int partIndex = 0;
+        int startIndex = 0;
+        int delimiterIndex = s.indexOf('#');
 
-    // Copy the content of msg to data
-    strcpy(data, msg);
-
-    // Tokenize the data using strtok
-    char *token = strtok(data, " ");
-    char *dir = token;
-    token = strtok(NULL, " ");
-    int degree = atoi(token);
-    token = strtok(NULL, "g");
-    int avg = atoi(token);
-    token = strtok(NULL, " ");
-    int gust = atoi(token);
-
-    char avg_g_gust[10]; // Adjust the size according to your needs
-    sprintf(avg_g_gust, " %dg%d ", avg, gust);
-
-    token = strtok(NULL, " "); // throwaway the comma surrounded by spaces
-    // Continue tokenization for AUX1 and AUX2
-    token = strtok(NULL, "_");
-    char aux1[24] = "."; // Assuming aux1 can be a maximum of 23 characters
-    if (token != nullptr) {
-        strncpy(aux1, token, 23);
-        aux1[23] = '\0'; // Null-terminate the aux1 string
-    }
-
-    // Tokenize again to get AUX2
-    token = strtok(NULL, " -");
-    char aux2[24] = "."; // Assuming aux2 can be a maximum of 23 characters
-    if (token != nullptr) {
-        strncpy(aux2, token, 23);
-        aux2[23] = '\0'; // Null-terminate the aux2 string
-    }
-
-    // clear the sprite
-    m_sprite.fillSprite(TFT_BLACK);
-
-    int y_offset = 0;
-    // we can move all fields down and display a long label at the very top.
-    if (aux2[0] == '.') {
-        y_offset = 22;
-        m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-        m_sprite.setCursor(5, 16); // put this at the top because verything else is moved down.
-        // m_sprite.setTextColor(EPD_BLACK);
-        m_sprite.print(devicestate.owner.long_name);
-    } else {
-        // DISPLAY LABEL normall but shorten if too long TODO
-        m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-        m_sprite.setCursor(250, 16);
-        // m_sprite.setTextColor(EPD_BLACK);
-        if (strlen(devicestate.owner.long_name) < 25) {
-            m_sprite.print(devicestate.owner.long_name); // maximum 6
-        } else {
-            m_sprite.print(devicestate.owner.short_name); // maximum 6
+        while (delimiterIndex != -1 && partIndex < maxParts) {
+            parts[partIndex++] = s.substring(startIndex, delimiterIndex);
+            Serial.println(s.substring(startIndex, delimiterIndex));
+            startIndex = delimiterIndex + 1;
+            delimiterIndex = s.indexOf('#', startIndex);
         }
-    }
-    // DISPLAY THE TIMESTAMP
-    // Find the position of the 'T' character
-    const char *timeStart = strstr(msg, "T");
-    // Create a buffer to store the time
-    char timeBuffer[6];
-    if (timeStart != nullptr) {
-        // Move one position ahead to point to the start of the time (hour)
-        timeStart += 1;
+        parts[partIndex] = s.substring(startIndex);
+        Serial.println(parts[partIndex]);
+        int colon = parts[1].indexOf(':');
+        String hour = parts[1].substring(0, colon);
+        String minute = parts[1].substring(colon + 1, colon + 3);
+        LOG_INFO("minute:");
+        LOG_INFO(minute.c_str());
+        // dual style, TSV
+        // DUALWIND \t 16:10 \t Kanaha \t NE \t 51 \t 20 \t 25 \t 8f,9s,NNE \t \t Kihei \tE \t 91 \t 30 \t 35 \t \t
+        // DUALWIND\t16:10\tKanaha\tNE\t51\t20\t25\t8f,9s,NNE\t\tKihei\tE\t91\t30\t35\t\t
+        // parts    0            1        2       3     4     5     6     7           8     9     10   11    12    13  14 15
+        m_sprite.fillSprite(TFT_BLACK);
 
-        // Copy the time to the buffer
-        strncpy(timeBuffer, timeStart, 5);
+        // LABEL
+        // display_label(m_data->get("label"),m_data->get("label2"));
+        int x = 20;
+        if (s.length() > 10)
+            x = 5; // move the x coord over if long name
+        m_sprite.setCursor(x, 30);
+        m_sprite.setFreeFont(MEDIUM);
+        m_sprite.setTextSize(1);
+        m_sprite.print(parts[2]);
+        // second set
+        m_sprite.setCursor(x + 360, 30);
+        m_sprite.print(parts[9]);
+        // also draw a line down the middle for separation
+        m_sprite.fillRect(310, 0, 4, 180, gray);
 
-        // Null-terminate the buffer
-        timeBuffer[5] = '\0';
-    }
+        // STAMP
+        m_sprite.setFreeFont(MEDIUM);
+        m_sprite.setCursor(570, 19);
+        m_sprite.print(hour + ":" + minute);
 
-    m_sprite.setFreeFont(MEDIUM);
-    m_sprite.setCursor(570, 19);
-    m_sprite.setTextWrap(false);
-    m_sprite.print(timeBuffer);
+        // VELOCITY
+        String avg = parts[5];
+        String gust = parts[6];
+        if (avg.toInt() < 15)
+            m_sprite.setTextColor(TFT_BLUE);
+        if (avg.toInt() >= 15)
+            m_sprite.setTextColor(TFT_CYAN);
+        if (avg.toInt() >= 25)
+            m_sprite.setTextColor(TFT_GREEN);
+        if (avg.toInt() >= 30)
+            m_sprite.setTextColor(TFT_MAGENTA);
+        if (avg.toInt() >= 35)
+            m_sprite.setTextColor(TFT_RED);
+        int y = 100;
+        // if (m_data->get("aux1").length() <= 1) y += 25;
+        m_sprite.setCursor(120, y);
+        m_sprite.setFreeFont(MEDLAR);
+        m_sprite.setTextSize(2);
+        m_sprite.print(avg);
+        m_sprite.setFreeFont(&FreeSans12pt7b);
+        m_sprite.print('g');
+        m_sprite.setFreeFont(MEDLAR);
+        m_sprite.print(gust);
 
-    // DISPLAY VELOCITY
-    // m_sprite.print(avg_g_gust);
-    if (avg < 15)
-        m_sprite.setTextColor(TFT_BLUE);
-    if (avg >= 15)
-        m_sprite.setTextColor(TFT_CYAN);
-    if (avg >= 25)
-        m_sprite.setTextColor(TFT_GREEN);
-    if (avg >= 30)
-        m_sprite.setTextColor(TFT_MAGENTA);
-    if (avg >= 35)
+        // second set
+        String avg2 = parts[12];
+        String gust2 = parts[13];
+        if (avg2.toInt() < 15)
+            m_sprite.setTextColor(TFT_BLUE);
+        if (avg2.toInt() >= 15)
+            m_sprite.setTextColor(TFT_CYAN);
+        if (avg2.toInt() >= 25)
+            m_sprite.setTextColor(TFT_GREEN);
+        if (avg2.toInt() >= 30)
+            m_sprite.setTextColor(TFT_MAGENTA);
+        if (avg2.toInt() >= 35)
+            m_sprite.setTextColor(TFT_RED);
+        m_sprite.setCursor(120 + 330, y);
+        // m_sprite.setFreeFont(LARGE);
+        // m_sprite.setTextSize(1);
+        m_sprite.print(avg2);
+        m_sprite.setFreeFont(&FreeSans12pt7b);
+        m_sprite.print('g');
+        m_sprite.setFreeFont(MEDLAR);
+        m_sprite.print(gust2);
+
+        // DIRECTION
+        y = 75;
+        if (parts[7].length() <= 1)
+            y += 25;
+        String card = parts[3];
+        String deg = parts[4];
         m_sprite.setTextColor(TFT_RED);
-    int y = 150;
-    // if (m_data->get("aux1").length() <= 1) y += 25;
-    m_sprite.setCursor(270, y);
-    m_sprite.setFreeFont(LARGE);
-    m_sprite.setTextSize(3);
-    m_sprite.print(avg);
-    m_sprite.setFreeFont(&FreeSans12pt7b);
-    m_sprite.print('g');
-    m_sprite.setFreeFont(LARGE);
-    m_sprite.print(gust);
+        if (card.equals("N"))
+            m_sprite.setTextColor(TFT_CYAN);
+        if (card.equals("NE"))
+            m_sprite.setTextColor(TFT_GREEN);
+        if (card.equals("ENE"))
+            m_sprite.setTextColor(TFT_YELLOW);
+        m_sprite.setFreeFont(MEDLAR);
+        m_sprite.setTextSize(1);
+        m_sprite.setCursor(5, y);
+        m_sprite.print(card);
+        m_sprite.setCursor(5, y + 32);
+        m_sprite.print(deg); // for now we'll use * for degree symbol
+        // m_sprite.setFreeFont(&FreeArial9full);
+        // m_sprite.setCursor(m_sprite.getCursorX(),m_sprite.getCursorY()-10);
+        // m_sprite.setTextSize(1);
+        // m_sprite.print("°");
 
-    // DISPLAY DIR
-    // m_sprite.print(dir);
-    // m_sprite.setCursor(5, 60 + y_offset);
-    // m_sprite.print(degree);
-    y = 60;
-    // if (m_data->get("aux1").length() <= 1) y += 25;
-    // if (m_config->gets("api_data_url").indexOf("maui") > -1 || m_config->gets("color_profile").equals("Maui") ) {
-    m_sprite.setTextColor(TFT_RED);
-    if (dir == "N")
+        // now do second set
+        String card2 = parts[10];
+        String deg2 = parts[11];
+        m_sprite.setFreeFont(MEDLAR);
+        m_sprite.setTextSize(1);
+        m_sprite.setCursor(5 + 320, y);
+        m_sprite.print(card2);
+        m_sprite.setCursor(5 + 320, y + 32);
+        m_sprite.print(deg2); // for now we'll use * for degree symbol
+        // m_sprite.setFreeFont(&FreeArial9full);
+        // m_sprite.setCursor(m_sprite.getCursorX(),m_sprite.getCursorY()-10);
+        // m_sprite.setTextSize(1);
+        // m_sprite.print("°");
+
+        // AUX 1'S
+        String s = parts[7];
+        String s2 = parts[14];
+        y = 145;
+        m_sprite.setTextColor(TFT_GREENYELLOW);
+        m_sprite.setFreeFont(SMALL);
+        m_sprite.setTextSize(1);
+        m_sprite.setCursor(10, y);
+        m_sprite.print(s);
+        m_sprite.setCursor(10 + 320, y);
+        m_sprite.print(s2);
+
+        // AUX 2'S
+        s = parts[8];
+        s2 = parts[15];
+        y = 170;
         m_sprite.setTextColor(TFT_CYAN);
-    if (dir == "NE")
-        m_sprite.setTextColor(TFT_GREEN);
-    if (dir == "ENE")
-        m_sprite.setTextColor(TFT_YELLOW);
-    // } else {
-    // 	m_sprite.setTextColor(TFT_GREEN);
-    // }
-    m_sprite.setFreeFont(LARGE);
-    m_sprite.setTextSize(1);
-    m_sprite.setCursor(5, y);
-    m_sprite.print(dir);
-    m_sprite.print(" ");
-    // m_sprite.setCursor(5,y+45);
-    m_sprite.print(degree); // for now we'll use * for degree symbol
-    // m_sprite.setFreeFont(&FreeArial9full);
-    m_sprite.setCursor(m_sprite.getCursorX(), m_sprite.getCursorY() - 10);
-    m_sprite.setTextSize(2);
-    m_sprite.print("°");
+        m_sprite.setFreeFont(SMALL);
+        m_sprite.setTextSize(1);
+        m_sprite.setCursor(10, y);
+        m_sprite.print(s);
+        m_sprite.setCursor(10 + 320, y);
+        m_sprite.print(s2);
+        LOG_DEBUG("OUT OF DUALWIND DISPLAY");
 
-    // DISPLAY AUX1
-    // m_sprite.print(aux1);
-    m_sprite.setTextColor(TFT_GREENYELLOW);
-    m_sprite.setFreeFont(MEDIUM);
-    m_sprite.setTextSize(1);
-    m_sprite.setCursor(10, 120);
-    m_sprite.print(aux1);
+    } else { // SINGLE WIND, parse with spaces n shit.
 
-    //  DISPLAY AUX2
-    // m_sprite.print(aux2);
-    m_sprite.setTextColor(TFT_CYAN);
-    m_sprite.setFreeFont(MEDIUM);
-    m_sprite.setTextSize(1);
-    m_sprite.setCursor(10, 160);
-    m_sprite.print(aux2);
+        // PARSE THE PACKET AND DETERMINE IF THIS IS SINGLE WIND OR DUAL WIND
+        // single style
+        // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07 ( uses the startup_message as label )
+
+        char data[70];
+
+        // Copy the content of msg to data
+        strcpy(data, msg);
+
+        // Tokenize the data using strtok
+        char *token = strtok(data, " ");
+        char *dir = token;
+        token = strtok(NULL, " ");
+        int degree = atoi(token);
+        token = strtok(NULL, "g");
+        int avg = atoi(token);
+        token = strtok(NULL, " ");
+        int gust = atoi(token);
+
+        char avg_g_gust[10]; // Adjust the size according to your needs
+        sprintf(avg_g_gust, " %dg%d ", avg, gust);
+
+        token = strtok(NULL, " "); // throwaway the comma surrounded by spaces
+        // Continue tokenization for AUX1 and AUX2
+        token = strtok(NULL, "_");
+        char aux1[24] = "."; // Assuming aux1 can be a maximum of 23 characters
+        if (token != nullptr) {
+            strncpy(aux1, token, 23);
+            aux1[23] = '\0'; // Null-terminate the aux1 string
+        }
+
+        // Tokenize again to get AUX2
+        token = strtok(NULL, " -");
+        char aux2[24] = "."; // Assuming aux2 can be a maximum of 23 characters
+        if (token != nullptr) {
+            strncpy(aux2, token, 23);
+            aux2[23] = '\0'; // Null-terminate the aux2 string
+        }
+
+        // clear the sprite
+        m_sprite.fillSprite(TFT_BLACK);
+
+        int y_offset = 0;
+        // we can move all fields down and display a long label at the very top.
+        if (aux2[0] == '.') {
+            y_offset = 22;
+            m_sprite.setFreeFont(&FreeMonoBold12pt7b);
+            m_sprite.setCursor(5, 16); // put this at the top because verything else is moved down.
+            // m_sprite.setTextColor(EPD_BLACK);
+            m_sprite.print(devicestate.owner.long_name);
+        } else {
+            // DISPLAY LABEL normall but shorten if too long TODO
+            m_sprite.setFreeFont(&FreeMonoBold12pt7b);
+            m_sprite.setCursor(250, 16);
+            // m_sprite.setTextColor(EPD_BLACK);
+            if (strlen(devicestate.owner.long_name) < 25) {
+                m_sprite.print(devicestate.owner.long_name); // maximum 6
+            } else {
+                m_sprite.print(devicestate.owner.short_name); // maximum 6
+            }
+        }
+        // DISPLAY THE TIMESTAMP
+        // Find the position of the 'T' character
+        const char *timeStart = strstr(msg, "T");
+        // Create a buffer to store the time
+        char timeBuffer[6];
+        if (timeStart != nullptr) {
+            // Move one position ahead to point to the start of the time (hour)
+            timeStart += 1;
+
+            // Copy the time to the buffer
+            strncpy(timeBuffer, timeStart, 5);
+
+            // Null-terminate the buffer
+            timeBuffer[5] = '\0';
+        }
+
+        m_sprite.setFreeFont(MEDIUM);
+        m_sprite.setCursor(570, 19);
+        m_sprite.setTextWrap(false);
+        m_sprite.print(timeBuffer);
+
+        // DISPLAY VELOCITY
+        // m_sprite.print(avg_g_gust);
+        if (avg < 15)
+            m_sprite.setTextColor(TFT_BLUE);
+        if (avg >= 15)
+            m_sprite.setTextColor(TFT_CYAN);
+        if (avg >= 25)
+            m_sprite.setTextColor(TFT_GREEN);
+        if (avg >= 30)
+            m_sprite.setTextColor(TFT_MAGENTA);
+        if (avg >= 35)
+            m_sprite.setTextColor(TFT_RED);
+        int y = 150;
+        // if (m_data->get("aux1").length() <= 1) y += 25;
+        m_sprite.setCursor(270, y);
+        m_sprite.setFreeFont(LARGE);
+        m_sprite.setTextSize(3);
+        m_sprite.print(avg);
+        m_sprite.setFreeFont(&FreeSans12pt7b);
+        m_sprite.print('g');
+        m_sprite.setFreeFont(LARGE);
+        m_sprite.print(gust);
+
+        // DISPLAY DIR
+        // m_sprite.print(dir);
+        // m_sprite.setCursor(5, 60 + y_offset);
+        // m_sprite.print(degree);
+        y = 60;
+        // if (m_data->get("aux1").length() <= 1) y += 25;
+        // if (m_config->gets("api_data_url").indexOf("maui") > -1 || m_config->gets("color_profile").equals("Maui") ) {
+        m_sprite.setTextColor(TFT_RED);
+        if (strcmp(dir, "N") == 0)
+            m_sprite.setTextColor(TFT_CYAN);
+        if (strcmp(dir, "NE") == 0)
+            m_sprite.setTextColor(TFT_GREEN);
+        if (strcmp(dir, "ENE") == 0)
+            m_sprite.setTextColor(TFT_YELLOW); // } else {
+        // 	m_sprite.setTextColor(TFT_GREEN);
+        // }
+        m_sprite.setFreeFont(LARGE);
+        m_sprite.setTextSize(1);
+        m_sprite.setCursor(5, y);
+        m_sprite.print(dir);
+        m_sprite.print(" ");
+        // m_sprite.setCursor(5,y+45);
+        m_sprite.print(degree); // for now we'll use * for degree symbol
+        // m_sprite.setFreeFont(&FreeArial9full);
+        m_sprite.setCursor(m_sprite.getCursorX(), m_sprite.getCursorY() - 10);
+        m_sprite.setTextSize(2);
+        m_sprite.print("°");
+
+        // DISPLAY AUX1
+        // m_sprite.print(aux1);
+        m_sprite.setTextColor(TFT_GREENYELLOW);
+        m_sprite.setFreeFont(MEDIUM);
+        m_sprite.setTextSize(1);
+        m_sprite.setCursor(10, 120);
+        m_sprite.print(aux1);
+
+        //  DISPLAY AUX2
+        // m_sprite.print(aux2);
+        m_sprite.setTextColor(TFT_CYAN);
+        m_sprite.setFreeFont(MEDIUM);
+        m_sprite.setTextSize(1);
+        m_sprite.setCursor(10, 160);
+        m_sprite.print(aux2);
+    }
 
     // m_sprite.display();
     lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());

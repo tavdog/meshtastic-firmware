@@ -635,6 +635,16 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     sprintf(msg, "%s", p.payload.bytes);
     if (strcmp(msg, last_data) == 0)
         return; // don't re-display duplicate info
+
+    // fade the screen animation.
+
+    for (int i = 255; i > 0; i--) {
+        analogWrite(TFT_BL, i);
+        delay(10); // Adjust delay to control the wipe speed
+    }
+
+    m_sprite.fillSprite(TFT_BLACK);
+
     strcpy(last_data, msg);
 
     String s = String(msg);
@@ -647,7 +657,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
         while (delimiterIndex != -1 && partIndex < maxParts) {
             parts[partIndex++] = s.substring(startIndex, delimiterIndex);
-            Serial.println(s.substring(startIndex, delimiterIndex));
+            // Serial.println(s.substring(startIndex, delimiterIndex));
             startIndex = delimiterIndex + 1;
             delimiterIndex = s.indexOf('#', startIndex);
         }
@@ -947,6 +957,10 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
     // m_sprite.display();
     lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
+    for (int i = 0; i < 256; i++) {
+        analogWrite(TFT_BL, i);
+        delay(10); // Adjust delay to control the wipe speed
+    }
 }
 void ExternalNotificationModule::displayText(const String msg)
 {

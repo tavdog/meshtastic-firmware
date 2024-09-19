@@ -357,12 +357,16 @@ ExternalNotificationModule::ExternalNotificationModule()
 
         m_sprite.createSprite(640, 180); // full screen landscape sprite in psram
         m_sprite.setSwapBytes(1);
-        digitalWrite(TFT_BL, HIGH); // turn on backlight
         // m_sprite.setFreeFont(&FreeMonoBold12pt7b);
         // m_sprite.setCursor(75, 16);
         // m_sprite.print(devicestate.owner.long_name); // maximum 6
         // lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
         lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)&gImage);
+        // fade in the screen
+        for (int i = 0; i < 256; i++) {
+            analogWrite(TFT_BL, i);
+            delay(10); // Adjust delay to control the wipe speed
+        }
         // delay(3000);
         LOG_INFO("DONE WINDYTRON_LOGO");
 
@@ -636,7 +640,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     if (strcmp(msg, last_data) == 0)
         return; // don't re-display duplicate info
 
-    // fade the screen animation.
+    // fade out the screen animation.
 
     for (int i = 255; i > 0; i--) {
         analogWrite(TFT_BL, i);
@@ -957,6 +961,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
     // m_sprite.display();
     lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
+    // fade in the screen
     for (int i = 0; i < 256; i++) {
         analogWrite(TFT_BL, i);
         delay(10); // Adjust delay to control the wipe speed

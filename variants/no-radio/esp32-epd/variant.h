@@ -19,7 +19,7 @@
 #define EPD_BUSY (4)
 #define EPD_RSET (16)
 #define EPD_DC (17)
-
+#define BUTTON_PIN 39
 #else
 #define EPD_SCK 18
 #define EPD_MISO 19

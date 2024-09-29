@@ -808,6 +808,8 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
     } else { // SINGLE WIND, parse with spaces n shit.
 
+        // should look for SINGLWIND# too because allows for custom label like in general-tron json format
+
         // PARSE THE PACKET AND DETERMINE IF THIS IS SINGLE WIND OR DUAL WIND
         // single style
         // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07 ( uses the startup_message as label )
@@ -969,6 +971,16 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 void ExternalNotificationModule::displayText(const String msg)
 {
 
+    if (msg.equals("fade_out")) {
+        // just fade out and then reboot.
+        for (int i = 255; i > 0; i--) {
+            analogWrite(TFT_BL, i);
+            delay(2); // Adjust delay to control the wipe speed
+        }
+        m_sprite.fillSprite(TFT_BLACK);
+        lcd_PushColors_rotated_90(0, 0, 640, 180, (uint16_t *)m_sprite.getPointer());
+        return;
+    }
     // m_sprite.clearBuffer();
     // lcd_fill(0, 0, 180, 640, 0x00);
     // auto &p = mp.decoded;

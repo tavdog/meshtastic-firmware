@@ -1,6 +1,7 @@
 /*
 Board Information: https://wiki.uniteng.com/en/meshtastic/station-g2
 */
+#define LONG 1
 #define SIMULATE_LORA 1
 #define HAS_GPS 0
 #define MESHTASTIC_EXCLUDE_SCREEN 1

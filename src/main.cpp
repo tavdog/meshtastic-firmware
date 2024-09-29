@@ -225,6 +225,11 @@ void printInfo()
 
 void setup()
 {
+// turn on the backlight for power on feedback. logo will take a few seconds.
+#ifdef LONG
+    pinMode(1, OUTPUT);
+    digitalWrite(1, HIGH);
+#endif
     concurrency::hasBeenSetup = true;
     meshtastic_Config_DisplayConfig_OledType screen_model =
         meshtastic_Config_DisplayConfig_OledType::meshtastic_Config_DisplayConfig_OledType_OLED_AUTO;
@@ -258,6 +263,7 @@ void setup()
     // digitalWrite(PIN_POWER_EN1, INPUT);
 #endif
 
+// axs15231_init();
 #if defined(LORA_TCXO_GPIO)
     pinMode(LORA_TCXO_GPIO, OUTPUT);
     digitalWrite(LORA_TCXO_GPIO, HIGH);

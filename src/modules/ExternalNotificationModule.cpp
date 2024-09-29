@@ -352,7 +352,6 @@ ExternalNotificationModule::ExternalNotificationModule()
         axs15231_init();
 
         LOG_INFO("DOING WINDYTRON_LOGO");
-        pinMode(TFT_BL, OUTPUT);
         digitalWrite(TFT_BL, LOW); // turn off backlight asap to minimise power on artifacts
 
         m_sprite.createSprite(640, 180); // full screen landscape sprite in psram

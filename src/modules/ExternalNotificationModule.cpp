@@ -665,7 +665,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
             delimiterIndex = s.indexOf('#', startIndex);
         }
         parts[partIndex] = s.substring(startIndex);
-        Serial.println(parts[partIndex]);
+        // Serial.println(parts[partIndex]);
         int colon = parts[1].indexOf(':');
         String hour = parts[1].substring(0, colon);
         String minute = parts[1].substring(colon + 1, colon + 3);

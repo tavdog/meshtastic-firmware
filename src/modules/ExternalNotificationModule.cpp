@@ -717,25 +717,25 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         aux2[23] = '\0'; // Null-terminate the aux2 string
     }
 
+    // lets display the channel this message come in on
+    // Assuming you have a meshtastic_MeshPacket object named 'mp'
+    ChannelIndex channelIndex = mp.channel;
+
+    // Get the Channels object (assuming it's a singleton or a global instance)
+    Channels channels;
+
+    // Get the channel name associated with the index
+    const char *channelName = channels.getName(channelIndex);
+
     int y_offset = 0;
-    // we can move all fields down and display a long label at the very top.
-    if (aux2[0] == '.') {
+    if (aux2[0] == '.')
         y_offset = 22;
-        display.setFont(&FreeMonoBold12pt7b);
-        display.setCursor(5, 16); // put this at the top because verything else is moved down.
-        display.setTextColor(EPD_BLACK);
-        display.print(devicestate.owner.long_name);
-    } else {
-        // DISPLAY LABEL normall but shorten if too long TODO
-        display.setFont(&FreeMonoBold12pt7b);
-        display.setCursor(75, 16);
-        display.setTextColor(EPD_BLACK);
-        if (strlen(devicestate.owner.long_name) < 9) {
-            display.print(devicestate.owner.long_name); // maximum 6
-        } else {
-            display.print(devicestate.owner.short_name); // maximum 6
-        }
-    }
+    // we can move all fields down and display a long label at the very top.
+    // DISPLAY LABEL normall but shorten if too long TODO
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setCursor(75, 16);
+    display.setTextColor(EPD_BLACK);
+    display.print(channelName); // maximum 6
     // DISPLAY THE TIMESTAMP
     // Find the position of the 'T' character
     const char *timeStart = strstr(msg, "T");

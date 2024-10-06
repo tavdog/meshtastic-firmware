@@ -652,7 +652,7 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
 
     String s = String(msg);
     String parts[20];
-    if (s.indexOf("DUALWIND") > -1) { // WE HAVE DUALWIND, PARSE TSV
+    if (s.indexOf("DUALWIND") > -1) { // WE HAVE DUALWIND, PARSE hackpack
         int maxParts = 20;
         int partIndex = 0;
         int startIndex = 0;
@@ -671,10 +671,9 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         String minute = parts[1].substring(colon + 1, colon + 3);
         LOG_INFO("minute:");
         LOG_INFO(minute.c_str());
-        // dual style, TSV
-        // DUALWIND \t 16:10 \t Kanaha \t NE \t 51 \t 20 \t 25 \t 8f,9s,NNE \t \t Kihei \tE \t 91 \t 30 \t 35 \t \t
-        // DUALWIND\t16:10\tKanaha\tNE\t51\t20\t25\t8f,9s,NNE\t\tKihei\tE\t91\t30\t35\t\t
-        // parts    0            1        2       3     4     5     6     7           8     9     10   11    12    13  14 15
+        // dual style, HASH style
+        // DUALWIND#23:49:#Kanaha + Pauwela#NE#41#19#22#1.6f,11s,S172#0814N0.0~1542H2.7#Kihei#N#357#11#19#1.6f,11s,S172#0814N0.0
+        // ~1542H2.7
         m_sprite.fillSprite(TFT_BLACK);
 
         // LABEL
@@ -805,92 +804,125 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         m_sprite.setCursor(10 + 320, y);
         m_sprite.print(s2);
         LOG_DEBUG("OUT OF DUALWIND DISPLAY");
+    } else { // SINGLE WIND, parse with spaces or hash map
 
-    } else { // SINGLE WIND, parse with spaces n shit.
+        // scope level variables for single display
+        String dir;
+        int degree;
+        int avg;
+        int gust;
 
-        // should look for SINGLWIND# too because allows for custom label like in general-tron json format
+        // char avg_g_gust[10]; // Adjust the size according to your needs
 
-        // PARSE THE PACKET AND DETERMINE IF THIS IS SINGLE WIND OR DUAL WIND
-        // single style
-        // NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07 ( uses the startup_message as label )
+        String aux1 = "."; // Assuming aux1 can be a maximum of 23 characters
+        String aux2 = "."; // Assuming aux2 can be a maximum of 23 characters
+        String timestamp;
+        String label;
 
-        char data[70];
+        if (s.indexOf("WIND#") > -1) {
+            // WIND#23:49:#Kanaha + Pauwela#NE#41#19#22#1.6f,11s,S172#0814N0.0~1542H2.7
+            int maxParts = 20;
+            int partIndex = 0;
+            int startIndex = 0;
+            int delimiterIndex = s.indexOf('#');
 
-        // Copy the content of msg to data
-        strcpy(data, msg);
+            while (delimiterIndex != -1 && partIndex < maxParts) {
+                parts[partIndex++] = s.substring(startIndex, delimiterIndex);
+                // Serial.println(s.substring(startIndex, delimiterIndex));
+                startIndex = delimiterIndex + 1;
+                delimiterIndex = s.indexOf('#', startIndex);
+            }
+            parts[partIndex] = s.substring(startIndex);
+            // Serial.println(parts[partIndex]);
+            int colon = parts[1].indexOf(':');
+            String hour = parts[1].substring(0, colon);
+            String minute = parts[1].substring(colon + 1, colon + 3);
+            LOG_INFO("minute:");
+            LOG_INFO(minute.c_str());
+            // dual style, HASH style
+            // DUALWIND#23:49:#Kanaha +
+            // Pauwela#NE#41#19#22#1.6f,11s,S172#0814N0.0~1542H2.7#Kihei#N#357#11#19#1.6f,11s,S172#0814N0.0 ~1542H2.7
 
-        // Tokenize the data using strtok
-        char *token = strtok(data, " ");
-        char *dir = token;
-        token = strtok(NULL, " ");
-        int degree = atoi(token);
-        token = strtok(NULL, "g");
-        int avg = atoi(token);
-        token = strtok(NULL, " ");
-        int gust = atoi(token);
+            m_sprite.fillSprite(TFT_BLACK);
 
-        char avg_g_gust[10]; // Adjust the size according to your needs
-        sprintf(avg_g_gust, " %dg%d ", avg, gust);
+            // String hour = parts[1].substring(0, colon);
+            // String minute = parts[1].substring(colon + 1, colon + 3);
+            timestamp = parts[1];
+            dir = parts[3];
+            degree = parts[4].toInt();
+            avg = parts[5].toInt();
+            gust = parts[6].toInt();
+            aux1 = parts[7];
+            aux2 = parts[8];
+            label = parts[2];
+        } else { // parse on spaces
+            // String msg = "NE 51 20g25 , AUX1_AUX2 - 2021-06-29T16:10:07"; // Example message
 
-        token = strtok(NULL, " "); // throwaway the comma surrounded by spaces
-        // Continue tokenization for AUX1 and AUX2
-        token = strtok(NULL, "_");
-        char aux1[24] = "."; // Assuming aux1 can be a maximum of 23 characters
-        if (token != nullptr) {
-            strncpy(aux1, token, 23);
-            aux1[23] = '\0'; // Null-terminate the aux1 string
+            // Split the string based on spaces and other delimiters
+            int firstSpace = s.indexOf(' ');
+            dir = s.substring(0, firstSpace);
+
+            int secondSpace = s.indexOf(' ', firstSpace + 1);
+            degree = s.substring(firstSpace + 1, secondSpace).toInt();
+
+            int gIndex = s.indexOf('g', secondSpace + 1);
+            avg = s.substring(secondSpace + 1, gIndex).toInt();
+
+            int thirdSpace = s.indexOf(' ', gIndex + 1);
+            gust = s.substring(gIndex + 1, thirdSpace).toInt();
+
+            // Continue to extract AUX1 and AUX2
+            int commaIndex = s.indexOf(',', thirdSpace + 1);
+            int underscoreIndex = s.indexOf('_', commaIndex + 1);
+            aux1 = s.substring(commaIndex + 2, underscoreIndex);
+
+            int dashIndex = s.indexOf('-', underscoreIndex + 1);
+            aux2 = s.substring(underscoreIndex + 1, dashIndex - 1);
+
+            // Parse the timestamp
+            int tIndex = s.indexOf('T');
+            if (tIndex != -1) {
+                timestamp = s.substring(tIndex + 1, tIndex + 6); // Extract the time
+            }
         }
 
-        // Tokenize again to get AUX2
-        token = strtok(NULL, " -");
-        char aux2[24] = "."; // Assuming aux2 can be a maximum of 23 characters
-        if (token != nullptr) {
-            strncpy(aux2, token, 23);
-            aux2[23] = '\0'; // Null-terminate the aux2 string
-        }
-
+        // Draw single display
         // clear the sprite
         m_sprite.fillSprite(TFT_BLACK);
+
+        if (label.isEmpty()) {
+            // Get the Channels object (assuming it's a singleton or a global instance)
+            label = devicestate.owner.long_name;
+            Channels channels;
+
+            // Iterate through the channels
+            for (int i = 0; i < channels.getNumChannels(); i++) {
+                meshtastic_Channel &ch = channels.getByIndex(i);
+
+                // Check if the channel has downlink enabled
+                if (ch.settings.downlink_enabled) {
+                    // Return the name of the channel
+                    label = String(channels.getName(i));
+                }
+            }
+        }
 
         int y_offset = 0;
         // we can move all fields down and display a long label at the very top.
         if (aux2[0] == '.') {
             y_offset = 22;
-            m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-            m_sprite.setCursor(5, 16); // put this at the top because verything else is moved down.
-            // m_sprite.setTextColor(EPD_BLACK);
-            m_sprite.print(devicestate.owner.long_name);
-        } else {
-            // DISPLAY LABEL normall but shorten if too long TODO
-            m_sprite.setFreeFont(&FreeMonoBold12pt7b);
-            m_sprite.setCursor(250, 16);
-            // m_sprite.setTextColor(EPD_BLACK);
-            if (strlen(devicestate.owner.long_name) < 25) {
-                m_sprite.print(devicestate.owner.long_name); // maximum 6
-            } else {
-                m_sprite.print(devicestate.owner.short_name); // maximum 6
-            }
         }
+
+        // DISPLAY LABEL normall but shorten if too long TODO
+        m_sprite.setFreeFont(&FreeMonoBold12pt7b);
+        m_sprite.setCursor(250, 16);
+        m_sprite.print(label); // maximum 6
+
         // DISPLAY THE TIMESTAMP
-        // Find the position of the 'T' character
-        const char *timeStart = strstr(msg, "T");
-        // Create a buffer to store the time
-        char timeBuffer[6];
-        if (timeStart != nullptr) {
-            // Move one position ahead to point to the start of the time (hour)
-            timeStart += 1;
-
-            // Copy the time to the buffer
-            strncpy(timeBuffer, timeStart, 5);
-
-            // Null-terminate the buffer
-            timeBuffer[5] = '\0';
-        }
-
         m_sprite.setFreeFont(MEDIUM);
         m_sprite.setCursor(570, 19);
         m_sprite.setTextWrap(false);
-        m_sprite.print(timeBuffer);
+        m_sprite.print(timestamp);
 
         // DISPLAY VELOCITY
         // m_sprite.print(avg_g_gust);
@@ -919,15 +951,15 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         // m_sprite.print(dir);
         // m_sprite.setCursor(5, 60 + y_offset);
         // m_sprite.print(degree);
-        y = 60;
+        y = 60 + y_offset;
         // if (m_data->get("aux1").length() <= 1) y += 25;
         // if (m_config->gets("api_data_url").indexOf("maui") > -1 || m_config->gets("color_profile").equals("Maui") ) {
         m_sprite.setTextColor(TFT_RED);
-        if (strcmp(dir, "N") == 0)
+        if (dir.equals("N") == 0)
             m_sprite.setTextColor(TFT_CYAN);
-        if (strcmp(dir, "NE") == 0)
+        if (dir.equals("NE") == 0)
             m_sprite.setTextColor(TFT_GREEN);
-        if (strcmp(dir, "ENE") == 0)
+        if (dir.equals("ENE") == 0)
             m_sprite.setTextColor(TFT_YELLOW); // } else {
         // 	m_sprite.setTextColor(TFT_GREEN);
         // }
@@ -949,15 +981,17 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         m_sprite.setFreeFont(MEDIUM);
         m_sprite.setTextSize(1);
         m_sprite.setCursor(10, 120);
-        m_sprite.print(aux1);
+        m_sprite.print(aux1 + y_offset);
 
-        //  DISPLAY AUX2
-        // m_sprite.print(aux2);
-        m_sprite.setTextColor(TFT_CYAN);
-        m_sprite.setFreeFont(MEDIUM);
-        m_sprite.setTextSize(1);
-        m_sprite.setCursor(10, 160);
-        m_sprite.print(aux2);
+        if (!aux1.isEmpty() && !aux1.equals(".")) {
+            //  DISPLAY AUX2
+            // m_sprite.print(aux2);
+            m_sprite.setTextColor(TFT_CYAN);
+            m_sprite.setFreeFont(MEDIUM);
+            m_sprite.setTextSize(1);
+            m_sprite.setCursor(10, 160);
+            m_sprite.print(aux2);
+        }
     }
 
     // m_sprite.display();

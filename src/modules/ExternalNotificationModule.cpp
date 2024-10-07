@@ -980,8 +980,8 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
         m_sprite.setTextColor(TFT_GREENYELLOW);
         m_sprite.setFreeFont(MEDIUM);
         m_sprite.setTextSize(1);
-        m_sprite.setCursor(10, 120);
-        m_sprite.print(aux1 + y_offset);
+        m_sprite.setCursor(10, 120 + y_offset);
+        m_sprite.print(aux1);
 
         if (!aux1.isEmpty() && !aux1.equals(".")) {
             //  DISPLAY AUX2

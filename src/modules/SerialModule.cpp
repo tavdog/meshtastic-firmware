@@ -234,8 +234,8 @@ void SerialModule::sendTelemetry(meshtastic_Telemetry m)
     p->decoded.payload.size =
         pb_encode_to_bytes(p->decoded.payload.bytes, sizeof(p->decoded.payload.bytes), &meshtastic_Telemetry_msg, &m);
     p->to = NODENUM_BROADCAST;
-    p->decoded.want_response = false;
-    p->priority = meshtastic_MeshPacket_Priority_RELIABLE;
+    p->decoded.want_response = true;
+    p->priority = meshtastic_MeshPacket_Priority_MAX;
     service.sendToMesh(p, RX_SRC_LOCAL, true);
 }
 

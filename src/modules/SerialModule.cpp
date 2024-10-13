@@ -408,8 +408,10 @@ void SerialModule::processWXSerial()
     static char windGust[5] = "xx.x"; // Assuming windGust is 4 characters long + null terminator
     static char batVoltage[5] = "0.0V";
     static char capVoltage[5] = "0.0V";
+    static char temperature[5] = "00.0";
     static float batVoltageF = 0;
     static float capVoltageF = 0;
+    static float temperatureF = 0;
     bool gotwind = false;
 
     while (Serial2.available()) {
@@ -483,6 +485,13 @@ void SerialModule::processWXSerial()
                             strcpy(capVoltage, capVoltagePos + 17); // 18 for ws 80, 17 for ws85
                             capVoltageF = strtof(capVoltage, nullptr);
                         }
+                        // GXTS04Temp   = 24.4
+                    } else if (strstr(line, "GXTS04Temp") != NULL) { // we have a temperature line
+                        char *tempPos = strstr(line, "GXTS04Temp   = ");
+                        if (tempPos != NULL) {
+                            strcpy(temperature, tempPos + 15); // 15 spaces for ws85
+                            temperatureF = strtof(temperature, nullptr);
+                        }
                     }
 
                     // Update lineStart for the next line
@@ -498,8 +507,8 @@ void SerialModule::processWXSerial()
     }
     if (gotwind) {
 
-        LOG_INFO("WS85 : %i %.1fg%.1f %.1fv %.1fv\n", atoi(windDir), strtof(windVel, nullptr), strtof(windGust, nullptr),
-                 batVoltageF, capVoltageF);
+        LOG_INFO("WS85 : %i %.1fg%.1f %.1fv %.1fv %.1fC\n", atoi(windDir), strtof(windVel, nullptr), strtof(windGust, nullptr),
+                 batVoltageF, capVoltageF, temperatureF);
     }
     if (gotwind && millis() - lastAveraged > averageIntervalMillis) {
         // calulate averages and send to the mesh
@@ -526,10 +535,12 @@ void SerialModule::processWXSerial()
         m.variant.environment_metrics.voltage =
             capVoltageF > batVoltageF ? capVoltageF : batVoltageF; // send the larger of the two voltage values.
 
-        LOG_INFO("WS85 Transmit speed=%fm/s, direction=%d , lull=%f, gust=%f, voltage=%f\n",
+        m.variant.environment_metrics.temperature = temperatureF;
+
+        LOG_INFO("WS85 Transmit speed=%fm/s, direction=%d , lull=%f, gust=%f, voltage=%f temperature=%f\n",
                  m.variant.environment_metrics.wind_speed, m.variant.environment_metrics.wind_direction,
                  m.variant.environment_metrics.wind_lull, m.variant.environment_metrics.wind_gust,
-                 m.variant.environment_metrics.voltage);
+                 m.variant.environment_metrics.voltage, m.variant.environment_metrics.temperature);
 
         sendTelemetry(m);
 

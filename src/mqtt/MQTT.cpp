@@ -561,8 +561,8 @@ void MQTT::onSend(const meshtastic_MeshPacket &mp_encrypted, const meshtastic_Me
         if (!isFromUs(&mp_decoded) && !isMqttServerAddressPrivate && dontUplink &&
             (ch.settings.psk.size < 2 || (ch.settings.psk.size == 16 && memcmp(ch.settings.psk.bytes, defaultpsk, 16)) ||
              (ch.settings.psk.size == 32 && memcmp(ch.settings.psk.bytes, eventpsk, 32)))) {
-            LOG_INFO("MQTT onSend - Not forwarding packet due to DontMqttMeBro flag");
-            return;
+            LOG_INFO("MQTT onSend - ignoring DontMqttMeBro flag");
+            // return;
         }
 
         if (strcmp(moduleConfig.mqtt.address, default_mqtt_address) == 0 &&

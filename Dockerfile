@@ -1,29 +1,32 @@
-# trunk-ignore-all(terrascan/AC_DOCKER_0002): Known terrascan issue
-# trunk-ignore-all(hadolint/DL3008): Use latest version of apt packages for buildchain
-# trunk-ignore-all(trivy/DS002): We must run as root for this container
-# trunk-ignore-all(checkov/CKV_DOCKER_8): We must run as root for this container
-# trunk-ignore-all(hadolint/DL3002): We must run as root for this container
+FROM debian:bookworm-slim AS builder
 
-FROM python:3.12-bookworm AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
-# Install Dependencies
-ENV PIP_ROOT_USER_ACTION=ignore
-RUN apt-get update && apt-get install --no-install-recommends -y wget g++ zip git ca-certificates \
-        libgpiod-dev libyaml-cpp-dev libbluetooth-dev libi2c-dev \
-        libusb-1.0-0-dev libulfius-dev liborcania-dev libssl-dev pkg-config && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir -U platformio==6.1.16 && \
-    mkdir /tmp/firmware
+# http://bugs.python.org/issue19846
+# > At the moment, setting "LANG=C" on a Linux system *fundamentally breaks Python 3*, and that's not OK.
+ENV LANG C.UTF-8
 
-# Copy source code
+# Install build deps
+USER root
+
+# trunk-ignore(terrascan/AC_DOCKER_0002): Known terrascan issue
+# trunk-ignore(hadolint/DL3008): Use latest version of packages for buildchain
+RUN apt-get update && apt-get install --no-install-recommends -y wget python3 python3-pip python3-wheel python3-venv g++ zip git \
+                           ca-certificates libgpiod-dev libyaml-cpp-dev libbluetooth-dev \
+                           libusb-1.0-0-dev libulfius-dev liborcania-dev libssl-dev pkg-config && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && mkdir /tmp/firmware
+
+RUN groupadd -g 1000 mesh && useradd -ml -u 1000 -g 1000 mesh && chown mesh:mesh /tmp/firmware
+USER mesh
+
 WORKDIR /tmp/firmware
-COPY . /tmp/firmware
-
-# Build
-RUN bash ./bin/build-native.sh && \
-    cp "/tmp/firmware/release/meshtasticd_linux_$(uname -m)" "/tmp/firmware/release/meshtasticd"
+RUN python3 -m venv /tmp/firmware 
+RUN bash -o pipefail -c "source bin/activate; pip3 install --no-cache-dir -U platformio==6.1.15"
+# trunk-ignore(terrascan/AC_DOCKER_00024): We would actually like these files to be owned by mesh tyvm
+COPY --chown=mesh:mesh . /tmp/firmware
+RUN bash -o pipefail -c "source ./bin/activate && bash ./bin/build-native.sh"
+RUN cp "/tmp/firmware/release/meshtasticd_linux_$(uname -m)" "/tmp/firmware/release/meshtasticd"
 
 
 ##### PRODUCTION BUILD #############
@@ -32,25 +35,20 @@ FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
-# nosemgrep: dockerfile.security.last-user-is-root.last-user-is-root
-USER root
+# trunk-ignore(terrascan/AC_DOCKER_0002): Known terrascan issue
+# trunk-ignore(hadolint/DL3008): Use latest version of packages for buildchain
+RUN apt-get update && apt-get --no-install-recommends -y install libc-bin libc6 libgpiod2 libyaml-cpp0.7 libulfius2.7 libusb-1.0-0-dev liborcania2.3 libssl3 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get --no-install-recommends -y install libc-bin libc6 libgpiod2 libyaml-cpp0.7 libi2c0 libulfius2.7 libusb-1.0-0-dev liborcania2.3 libssl3 && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /var/lib/meshtasticd \
-    && mkdir -p /etc/meshtasticd/config.d
+RUN groupadd -g 1000 mesh && useradd -ml -u 1000 -g 1000 mesh
+USER mesh
 
-# Fetch compiled binary from the builder
-COPY --from=builder /tmp/firmware/release/meshtasticd /usr/sbin/
-# Copy config templates
-COPY ./bin/config.d /etc/meshtasticd/available.d
+WORKDIR /home/mesh
+COPY --from=builder /tmp/firmware/release/meshtasticd /home/mesh/
 
-WORKDIR /var/lib/meshtasticd
-VOLUME /var/lib/meshtasticd
+RUN mkdir data
+VOLUME /home/mesh/data
 
-# Expose Meshtastic TCP API port from the host
-EXPOSE 4403
-
-CMD [ "sh", "-cx", "meshtasticd -d /var/lib/meshtasticd" ]
+CMD [ "sh",  "-cx", "./meshtasticd -d /home/mesh/data --hwid=${HWID:-$RANDOM}" ]
 
 HEALTHCHECK NONE

@@ -318,7 +318,7 @@ bool Channels::anyMqttEnabled()
 {
 #if USERPREFS_EVENT_MODE
     // Don't publish messages on the public MQTT broker if we are in event mode
-    if (mqtt && mqtt.isUsingDefaultServer()) {
+    if (strcmp(moduleConfig.mqtt.address, default_mqtt_address) == 0) {
         return false;
     }
 #endif

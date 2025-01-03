@@ -20,6 +20,7 @@
 #endif
 #include "Default.h"
 #if !defined(ARCH_NRF52) || NRF52_USE_JSON
+#if !defined(ARCH_NRF52) || NRF52_USE_JSON
 #include "serialization/JSON.h"
 #include "serialization/MeshPacketSerializer.h"
 #endif
@@ -35,9 +36,22 @@
 #include <machine/endian.h>
 #define ntohl __ntohl
 #endif
+#include <pb_decode.h>
+#include <utility>
+
+#include <IPAddress.h>
+#if defined(ARCH_PORTDUINO)
+#include <netinet/in.h>
+#elif !defined(ntohl)
+#include <machine/endian.h>
+#define ntohl __ntohl
+#endif
 
 MQTT *mqtt;
 
+namespace
+{
+constexpr int reconnectMax = 5;
 namespace
 {
 constexpr int reconnectMax = 5;
@@ -157,6 +171,15 @@ inline void onReceiveJson(byte *payload, size_t length)
     if (json["type"]->AsString().compare("sendtext") == 0 && json["payload"]->IsString()) {
         std::string jsonPayloadStr = json["payload"]->AsString();
         LOG_INFO("JSON payload %s, length %u", jsonPayloadStr.c_str(), jsonPayloadStr.length());
+    if (!isValidJsonEnvelope(json)) {
+        LOG_ERROR("JSON received payload on MQTT but not a valid envelope");
+        return;
+    }
+
+    // this is a valid envelope
+    if (json["type"]->AsString().compare("sendtext") == 0 && json["payload"]->IsString()) {
+        std::string jsonPayloadStr = json["payload"]->AsString();
+        LOG_INFO("JSON payload %s, length %u", jsonPayloadStr.c_str(), jsonPayloadStr.length());
 
         // construct protobuf data packet using TEXT_MESSAGE, send it to the mesh
         meshtastic_MeshPacket *p = router->allocForSending();
@@ -188,7 +211,89 @@ inline void onReceiveJson(byte *payload, size_t length)
             pos.altitude = posit["altitude"]->AsNumber();
         if (posit.find("time") != posit.end() && posit["time"]->IsNumber())
             pos.time = posit["time"]->AsNumber();
+        // construct protobuf data packet using TEXT_MESSAGE, send it to the mesh
+        meshtastic_MeshPacket *p = router->allocForSending();
+        p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
+        if (json.find("channel") != json.end() && json["channel"]->IsNumber() &&
+            (json["channel"]->AsNumber() < channels.getNumChannels()))
+            p->channel = json["channel"]->AsNumber();
+        if (json.find("to") != json.end() && json["to"]->IsNumber())
+            p->to = json["to"]->AsNumber();
+        if (json.find("hopLimit") != json.end() && json["hopLimit"]->IsNumber())
+            p->hop_limit = json["hopLimit"]->AsNumber();
+        if (jsonPayloadStr.length() <= sizeof(p->decoded.payload.bytes)) {
+            memcpy(p->decoded.payload.bytes, jsonPayloadStr.c_str(), jsonPayloadStr.length());
+            p->decoded.payload.size = jsonPayloadStr.length();
+            service->sendToMesh(p, RX_SRC_LOCAL);
+        } else {
+            LOG_WARN("Received MQTT json payload too long, drop");
+        }
+    } else if (json["type"]->AsString().compare("sendposition") == 0 && json["payload"]->IsObject()) {
+        // invent the "sendposition" type for a valid envelope
+        JSONObject posit;
+        posit = json["payload"]->AsObject(); // get nested JSON Position
+        meshtastic_Position pos = meshtastic_Position_init_default;
+        if (posit.find("latitude_i") != posit.end() && posit["latitude_i"]->IsNumber())
+            pos.latitude_i = posit["latitude_i"]->AsNumber();
+        if (posit.find("longitude_i") != posit.end() && posit["longitude_i"]->IsNumber())
+            pos.longitude_i = posit["longitude_i"]->AsNumber();
+        if (posit.find("altitude") != posit.end() && posit["altitude"]->IsNumber())
+            pos.altitude = posit["altitude"]->AsNumber();
+        if (posit.find("time") != posit.end() && posit["time"]->IsNumber())
+            pos.time = posit["time"]->AsNumber();
 
+        // construct protobuf data packet using POSITION, send it to the mesh
+        meshtastic_MeshPacket *p = router->allocForSending();
+        p->decoded.portnum = meshtastic_PortNum_POSITION_APP;
+        if (json.find("channel") != json.end() && json["channel"]->IsNumber() &&
+            (json["channel"]->AsNumber() < channels.getNumChannels()))
+            p->channel = json["channel"]->AsNumber();
+        if (json.find("to") != json.end() && json["to"]->IsNumber())
+            p->to = json["to"]->AsNumber();
+        if (json.find("hopLimit") != json.end() && json["hopLimit"]->IsNumber())
+            p->hop_limit = json["hopLimit"]->AsNumber();
+        p->decoded.payload.size =
+            pb_encode_to_bytes(p->decoded.payload.bytes, sizeof(p->decoded.payload.bytes), &meshtastic_Position_msg,
+                               &pos); // make the Data protobuf from position
+        service->sendToMesh(p, RX_SRC_LOCAL);
+    } else {
+        LOG_DEBUG("JSON ignore downlink message with unsupported type");
+    }
+}
+#endif
+
+/// Determines if the given IPAddress is a private IPv4 address, i.e. not routable on the public internet.
+bool isPrivateIpAddress(const IPAddress &ip)
+{
+    constexpr struct {
+        uint32_t network;
+        uint32_t mask;
+    } privateCidrRanges[] = {
+        {.network = 192u << 24 | 168 << 16, .mask = 0xffff0000}, // 192.168.0.0/16
+        {.network = 172u << 24 | 16 << 16, .mask = 0xfff00000},  // 172.16.0.0/12
+        {.network = 169u << 24 | 254 << 16, .mask = 0xffff0000}, // 169.254.0.0/16
+        {.network = 10u << 24, .mask = 0xff000000},              // 10.0.0.0/8
+        {.network = 127u << 24 | 1, .mask = 0xffffffff},         // 127.0.0.1/32
+    };
+    const uint32_t addr = ntohl(ip);
+    for (const auto &cidrRange : privateCidrRanges) {
+        if (cidrRange.network == (addr & cidrRange.mask)) {
+            LOG_INFO("MQTT server on a private IP");
+            return true;
+        }
+    }
+    return false;
+}
+
+// Separate a <host>[:<port>] string. Returns a pair containing the parsed host and port. If the port is
+// not present in the input string, or is invalid, the value of the `port` argument will be returned.
+std::pair<String, uint16_t> parseHostAndPort(String server, uint16_t port = 0)
+{
+    const int delimIndex = server.indexOf(':');
+    if (delimIndex > 0) {
+        const long parsedPort = server.substring(delimIndex + 1, server.length()).toInt();
+        if (parsedPort < 1 || parsedPort > UINT16_MAX) {
+            LOG_WARN("Invalid MQTT port %d: %s", parsedPort, server.c_str());
         // construct protobuf data packet using POSITION, send it to the mesh
         meshtastic_MeshPacket *p = router->allocForSending();
         p->decoded.portnum = meshtastic_PortNum_POSITION_APP;
@@ -288,6 +393,13 @@ void MQTT::onReceive(char *topic, byte *payload, size_t length)
     }
 
     onReceiveProto(topic, payload, length);
+        }
+        onReceiveJson(payload, length);
+#endif
+        return;
+    }
+
+    onReceiveProto(topic, payload, length);
 }
 
 void mqttInit()
@@ -324,6 +436,10 @@ MQTT::MQTT() : concurrency::OSThread("mqtt"), mqttQueue(MAX_MQTT_QUEUE)
                 moduleConfig.mqtt.map_report_settings.publish_interval_secs, default_map_publish_interval_secs);
         }
 
+        String host = parseHostAndPort(moduleConfig.mqtt.address).first;
+        isConfiguredForDefaultServer = host.length() == 0 || host == default_mqtt_address;
+        IPAddress ip;
+        isMqttServerAddressPrivate = ip.fromString(host.c_str()) && isPrivateIpAddress(ip);
         IPAddress ip;
         isMqttServerAddressPrivate =
             ip.fromString(parseHostAndPort(moduleConfig.mqtt.address).first.c_str()) && isPrivateIpAddress(ip);
@@ -445,6 +561,9 @@ void MQTT::reconnect()
         std::pair<String, uint16_t> hostAndPort = parseHostAndPort(serverAddr, serverPort);
         serverAddr = hostAndPort.first.c_str();
         serverPort = hostAndPort.second;
+        std::pair<String, uint16_t> hostAndPort = parseHostAndPort(serverAddr, serverPort);
+        serverAddr = hostAndPort.first.c_str();
+        serverPort = hostAndPort.second;
         pubSub.setServer(serverAddr, serverPort);
         pubSub.setBufferSize(512);
 
@@ -457,6 +576,7 @@ void MQTT::reconnect()
             enabled = true; // Start running background process again
             runASAP = true;
             reconnectCount = 0;
+            isMqttServerAddressPrivate = isPrivateIpAddress(mqttClient.remoteIP());
 
             publishNodeInfo();
             sendSubscriptions();
@@ -580,9 +700,36 @@ void MQTT::publishQueuedMessages()
     const std::unique_ptr<QueueEntry> entry(mqttQueue.dequeuePtr(0));
     LOG_INFO("publish %s, %u bytes from queue", entry->topic.c_str(), entry->envBytes.size());
     publish(entry->topic.c_str(), entry->envBytes.data(), entry->envBytes.size(), false);
+    if (mqttQueue.isEmpty())
+        return;
+
+    LOG_DEBUG("Publish enqueued MQTT message");
+    const std::unique_ptr<QueueEntry> entry(mqttQueue.dequeuePtr(0));
+    LOG_INFO("publish %s, %u bytes from queue", entry->topic.c_str(), entry->envBytes.size());
+    publish(entry->topic.c_str(), entry->envBytes.data(), entry->envBytes.size(), false);
 
 #if !defined(ARCH_NRF52) ||                                                                                                      \
     defined(NRF52_USE_JSON) // JSON is not supported on nRF52, see issue #2804 ### Fixed by using ArduinoJson ###
+    if (!moduleConfig.mqtt.json_enabled)
+        return;
+
+    // handle json topic
+    const DecodedServiceEnvelope env(entry->envBytes.data(), entry->envBytes.size());
+    if (!env.validDecode || env.packet == NULL || env.channel_id == NULL)
+        return;
+
+    auto jsonString = MeshPacketSerializer::JsonSerialize(env.packet);
+    if (jsonString.length() == 0)
+        return;
+
+    std::string topicJson;
+    if (env.packet->pki_encrypted) {
+        topicJson = jsonTopic + "PKI/" + owner.id;
+    } else {
+        topicJson = jsonTopic + env.channel_id + "/" + owner.id;
+    }
+    LOG_INFO("JSON publish message to %s, %u bytes: %s", topicJson.c_str(), jsonString.length(), jsonString.c_str());
+    publish(topicJson.c_str(), jsonString.c_str(), false);
     if (!moduleConfig.mqtt.json_enabled)
         return;
 
@@ -632,9 +779,8 @@ void MQTT::onSend(const meshtastic_MeshPacket &mp_encrypted, const meshtastic_Me
             // return;
         }
 
-        if (strcmp(moduleConfig.mqtt.address, default_mqtt_address) == 0 &&
-            (mp_decoded.decoded.portnum == meshtastic_PortNum_RANGE_TEST_APP ||
-             mp_decoded.decoded.portnum == meshtastic_PortNum_DETECTION_SENSOR_APP)) {
+        if (isConfiguredForDefaultServer && (mp_decoded.decoded.portnum == meshtastic_PortNum_RANGE_TEST_APP ||
+                                             mp_decoded.decoded.portnum == meshtastic_PortNum_DETECTION_SENSOR_APP)) {
             LOG_DEBUG("MQTT onSend - Ignoring range test or detection sensor message on public mqtt");
             return;
         }
@@ -642,6 +788,9 @@ void MQTT::onSend(const meshtastic_MeshPacket &mp_encrypted, const meshtastic_Me
     // Either encrypted packet (we couldn't decrypt) is marked as pki_encrypted, or we could decode the PKI encrypted packet
     bool isPKIEncrypted = mp_encrypted.pki_encrypted || mp_decoded.pki_encrypted;
     // If it was to a channel, check uplink enabled, else must be pki_encrypted
+    if (!(ch.settings.uplink_enabled || isPKIEncrypted))
+        return;
+    const char *channelId = isPKIEncrypted ? "PKI" : channels.getGlobalId(chIndex);
     if (!(ch.settings.uplink_enabled || isPKIEncrypted))
         return;
     const char *channelId = isPKIEncrypted ? "PKI" : channels.getGlobalId(chIndex);
@@ -663,13 +812,42 @@ void MQTT::onSend(const meshtastic_MeshPacket &mp_encrypted, const meshtastic_Me
         .packet = const_cast<meshtastic_MeshPacket *>(p), .channel_id = const_cast<char *>(channelId), .gateway_id = owner.id};
     size_t numBytes = pb_encode_to_bytes(bytes, sizeof(bytes), &meshtastic_ServiceEnvelope_msg, &env);
     std::string topic = cryptTopic + channelId + "/" + owner.id;
+    LOG_DEBUG("MQTT onSend - Publish ");
+    const meshtastic_MeshPacket *p;
+    if (moduleConfig.mqtt.encryption_enabled) {
+        p = &mp_encrypted;
+        LOG_DEBUG("encrypted message");
+    } else if (mp_decoded.which_payload_variant == meshtastic_MeshPacket_decoded_tag) {
+        p = &mp_decoded;
+        LOG_DEBUG("portnum %i message", mp_decoded.decoded.portnum);
+    } else {
+        LOG_DEBUG("nothing, pkt not decrypted");
+        return; // Don't upload a still-encrypted PKI packet if not encryption_enabled
+    }
 
+    const meshtastic_ServiceEnvelope env = {
+        .packet = const_cast<meshtastic_MeshPacket *>(p), .channel_id = const_cast<char *>(channelId), .gateway_id = owner.id};
+    size_t numBytes = pb_encode_to_bytes(bytes, sizeof(bytes), &meshtastic_ServiceEnvelope_msg, &env);
+    std::string topic = cryptTopic + channelId + "/" + owner.id;
+
+    if (moduleConfig.mqtt.proxy_to_client_enabled || this->isConnectedDirectly()) {
+        LOG_DEBUG("MQTT Publish %s, %u bytes", topic.c_str(), numBytes);
+        publish(topic.c_str(), bytes, numBytes, false);
     if (moduleConfig.mqtt.proxy_to_client_enabled || this->isConnectedDirectly()) {
         LOG_DEBUG("MQTT Publish %s, %u bytes", topic.c_str(), numBytes);
         publish(topic.c_str(), bytes, numBytes, false);
 
 #if !defined(ARCH_NRF52) ||                                                                                                      \
     defined(NRF52_USE_JSON) // JSON is not supported on nRF52, see issue #2804 ### Fixed by using ArduinoJson ###
+        if (!moduleConfig.mqtt.json_enabled)
+            return;
+        // handle json topic
+        auto jsonString = MeshPacketSerializer::JsonSerialize(&mp_decoded);
+        if (jsonString.length() == 0)
+            return;
+        std::string topicJson = jsonTopic + channelId + "/" + owner.id;
+        LOG_INFO("JSON publish message to %s, %u bytes: %s", topicJson.c_str(), jsonString.length(), jsonString.c_str());
+        publish(topicJson.c_str(), jsonString.c_str(), false);
         if (!moduleConfig.mqtt.json_enabled)
             return;
         // handle json topic
@@ -692,6 +870,18 @@ void MQTT::onSend(const meshtastic_MeshPacket &mp_encrypted, const meshtastic_Me
         entry->topic = std::move(topic);
         entry->envBytes.assign(bytes, numBytes);
         assert(mqttQueue.enqueue(entry, 0));
+    } else {
+        LOG_INFO("MQTT not connected, queue packet");
+        QueueEntry *entry;
+        if (mqttQueue.numFree() == 0) {
+            LOG_WARN("MQTT queue is full, discard oldest");
+            entry = mqttQueue.dequeuePtr(0);
+        } else {
+            entry = new QueueEntry;
+        }
+        entry->topic = std::move(topic);
+        entry->envBytes.assign(bytes, numBytes);
+        assert(mqttQueue.enqueue(entry, 0));
     }
 }
 
@@ -701,7 +891,17 @@ void MQTT::perhapsReportToMap()
         return;
 
     if (Throttle::isWithinTimespanMs(last_report_to_map, map_publish_interval_msecs))
+    if (Throttle::isWithinTimespanMs(last_report_to_map, map_publish_interval_msecs))
         return;
+
+    if (map_position_precision == 0 || (localPosition.latitude_i == 0 && localPosition.longitude_i == 0)) {
+        last_report_to_map = millis();
+        if (map_position_precision == 0)
+            LOG_WARN("MQTT Map report enabled, but precision is 0");
+        if (localPosition.latitude_i == 0 && localPosition.longitude_i == 0)
+            LOG_WARN("MQTT Map report enabled, but no position available");
+        return;
+    }
 
     if (map_position_precision == 0 || (localPosition.latitude_i == 0 && localPosition.longitude_i == 0)) {
         last_report_to_map = millis();
@@ -718,7 +918,23 @@ void MQTT::perhapsReportToMap()
     mp->from = nodeDB->getNodeNum();
     mp->to = NODENUM_BROADCAST;
     mp->decoded.portnum = meshtastic_PortNum_MAP_REPORT_APP;
+    // Allocate MeshPacket and fill it
+    meshtastic_MeshPacket *mp = packetPool.allocZeroed();
+    mp->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
+    mp->from = nodeDB->getNodeNum();
+    mp->to = NODENUM_BROADCAST;
+    mp->decoded.portnum = meshtastic_PortNum_MAP_REPORT_APP;
 
+    // Fill MapReport message
+    meshtastic_MapReport mapReport = meshtastic_MapReport_init_default;
+    memcpy(mapReport.long_name, owner.long_name, sizeof(owner.long_name));
+    memcpy(mapReport.short_name, owner.short_name, sizeof(owner.short_name));
+    mapReport.role = config.device.role;
+    mapReport.hw_model = owner.hw_model;
+    strncpy(mapReport.firmware_version, optstr(APP_VERSION), sizeof(mapReport.firmware_version));
+    mapReport.region = config.lora.region;
+    mapReport.modem_preset = config.lora.modem_preset;
+    mapReport.has_default_channel = channels.hasDefaultChannel();
     // Fill MapReport message
     meshtastic_MapReport mapReport = meshtastic_MapReport_init_default;
     memcpy(mapReport.long_name, owner.long_name, sizeof(owner.long_name));
@@ -742,9 +958,32 @@ void MQTT::perhapsReportToMap()
     }
     mapReport.altitude = localPosition.altitude;
     mapReport.position_precision = map_position_precision;
+    // Set position with precision (same as in PositionModule)
+    if (map_position_precision < 32 && map_position_precision > 0) {
+        mapReport.latitude_i = localPosition.latitude_i & (UINT32_MAX << (32 - map_position_precision));
+        mapReport.longitude_i = localPosition.longitude_i & (UINT32_MAX << (32 - map_position_precision));
+        mapReport.latitude_i += (1 << (31 - map_position_precision));
+        mapReport.longitude_i += (1 << (31 - map_position_precision));
+    } else {
+        mapReport.latitude_i = localPosition.latitude_i;
+        mapReport.longitude_i = localPosition.longitude_i;
+    }
+    mapReport.altitude = localPosition.altitude;
+    mapReport.position_precision = map_position_precision;
 
     mapReport.num_online_local_nodes = nodeDB->getNumOnlineMeshNodes(true);
+    mapReport.num_online_local_nodes = nodeDB->getNumOnlineMeshNodes(true);
 
+    // Encode MapReport message into the MeshPacket
+    mp->decoded.payload.size =
+        pb_encode_to_bytes(mp->decoded.payload.bytes, sizeof(mp->decoded.payload.bytes), &meshtastic_MapReport_msg, &mapReport);
+
+    // Encode the MeshPacket into a binary ServiceEnvelope and publish
+    const meshtastic_ServiceEnvelope se = {
+        .packet = mp,
+        .channel_id = (char *)channels.getGlobalId(channels.getPrimaryIndex()), // Use primary channel as the channel_id
+        .gateway_id = owner.id};
+    size_t numBytes = pb_encode_to_bytes(bytes, sizeof(bytes), &meshtastic_ServiceEnvelope_msg, &se);
     // Encode MapReport message into the MeshPacket
     mp->decoded.payload.size =
         pb_encode_to_bytes(mp->decoded.payload.bytes, sizeof(mp->decoded.payload.bytes), &meshtastic_MapReport_msg, &mapReport);
@@ -758,10 +997,17 @@ void MQTT::perhapsReportToMap()
 
     LOG_INFO("MQTT Publish map report to %s", mapTopic.c_str());
     publish(mapTopic.c_str(), bytes, numBytes, false);
+    LOG_INFO("MQTT Publish map report to %s", mapTopic.c_str());
+    publish(mapTopic.c_str(), bytes, numBytes, false);
 
     // Release the allocated memory for MeshPacket
     packetPool.release(mp);
+    // Release the allocated memory for MeshPacket
+    packetPool.release(mp);
 
+    // Update the last report time
+    last_report_to_map = millis();
+}
     // Update the last report time
     last_report_to_map = millis();
 }

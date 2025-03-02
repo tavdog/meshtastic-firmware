@@ -93,6 +93,8 @@ class Channels
     bool anyMqttEnabled();
 
     bool ensureLicensedOperation();
+    // cycle the mqttdownlink channel
+    void cycleMqttDownlink();
 
   private:
     /** Given a channel index, change to use the crypto key specified by that index

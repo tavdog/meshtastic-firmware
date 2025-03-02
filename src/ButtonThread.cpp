@@ -1,6 +1,7 @@
 #include "ButtonThread.h"
 
 #include "configuration.h"
+#include "mesh/NodeDB.h"
 #if !MESHTASTIC_EXCLUDE_GPS
 #include "GPS.h"
 #endif
@@ -9,9 +10,12 @@
 #include "RadioLibInterface.h"
 #include "buzz.h"
 #include "main.h"
+#include "mesh/PhoneAPI.h"
 #include "modules/ExternalNotificationModule.h"
 #include "power.h"
 #include "sleep.h"
+// #include "nimble/NimbleBluetooth.h"
+#include "BluetoothCommon.h"
 #ifdef ARCH_PORTDUINO
 #include "platform/portduino/PortduinoGlue.h"
 #endif
@@ -155,6 +159,13 @@ int32_t ButtonThread::runOnce()
                 !moduleConfig.canned_message.enabled) {
                 powerFSM.trigger(EVENT_PRESS);
             }
+            // iterate channel downlinks
+            channels.cycleMqttDownlink();
+
+            nodeDB->saveChannelsToDisk();
+
+            rebootAtMsec = 1;
+
 #endif
 #if defined(ARCH_PORTDUINO)
             if ((settingsMap.count(user) != 0 && settingsMap[user] != RADIOLIB_NC) &&

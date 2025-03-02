@@ -10,5 +10,6 @@
   },
   "files.associations": {
     "*.tpp": "cpp"
-  }
+  },
+  "codeQL.githubDatabase.download": "never"
 }

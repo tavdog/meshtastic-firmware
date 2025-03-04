@@ -7,5 +7,6 @@
   "cmake.configureOnOpen": false,
   "[cpp]": {
     "editor.defaultFormatter": "ms-vscode.cpptools"
-  }
+  },
+  "codeQL.githubDatabase.download": "never"
 }

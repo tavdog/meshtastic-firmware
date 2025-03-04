@@ -167,6 +167,7 @@ class NodeDB
     }
 
     bool hasValidPosition(const meshtastic_NodeInfoLite *n);
+    bool saveChannelsToDisk();
 
   private:
     uint32_t lastNodeDbSave = 0; // when we last saved our db to flash
@@ -195,7 +196,6 @@ class NodeDB
     /// @return true if the save was successful
     bool saveToDiskNoRetry(int saveWhat);
 
-    bool saveChannelsToDisk();
     bool saveDeviceStateToDisk();
 };
 

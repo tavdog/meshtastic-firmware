@@ -79,13 +79,13 @@ bool EInkDisplay::forceDisplay(uint32_t msecLimit)
     }
 
     // Trigger the refresh in GxEPD2
-    LOG_DEBUG("Updating E-Paper... ");
+    LOG_DEBUG("Update E-Paper");
     adafruitDisplay->nextPage();
 
     // End the update process
     endUpdate();
 
-    LOG_DEBUG("done\n");
+    LOG_DEBUG("done");
     return true;
 }
 
@@ -123,7 +123,7 @@ void EInkDisplay::setDetected(uint8_t detected)
 // Connect to the display - variant specific
 bool EInkDisplay::connect()
 {
-    LOG_INFO("Doing EInk init\n");
+    LOG_INFO("Do EInk init");
 
 #ifdef PIN_EINK_EN
     // backlight power, HIGH is backlight on, LOW is off
@@ -132,6 +132,15 @@ bool EInkDisplay::connect()
 #endif
 
 #if defined(TTGO_T_ECHO)
+    {
+        auto lowLevel = new EINK_DISPLAY_MODEL(PIN_EINK_CS, PIN_EINK_DC, PIN_EINK_RES, PIN_EINK_BUSY, SPI1);
+
+        adafruitDisplay = new GxEPD2_BW<EINK_DISPLAY_MODEL, EINK_DISPLAY_MODEL::HEIGHT>(*lowLevel);
+        adafruitDisplay->init();
+        adafruitDisplay->setRotation(3);
+        adafruitDisplay->setPartialWindow(0, 0, displayWidth, displayHeight);
+    }
+#elif defined(MESHLINK)
     {
         auto lowLevel = new EINK_DISPLAY_MODEL(PIN_EINK_CS, PIN_EINK_DC, PIN_EINK_RES, PIN_EINK_BUSY, SPI1);
 
@@ -157,7 +166,7 @@ bool EInkDisplay::connect()
     }
 
 #elif defined(HELTEC_WIRELESS_PAPER_V1_0) || defined(HELTEC_WIRELESS_PAPER) || defined(HELTEC_VISION_MASTER_E213) ||             \
-    defined(HELTEC_VISION_MASTER_E290)
+    defined(HELTEC_VISION_MASTER_E290) || defined(TLORA_T3S3_EPAPER)
     {
         // Start HSPI
         hspi = new SPIClass(HSPI);
@@ -174,13 +183,13 @@ bool EInkDisplay::connect()
         adafruitDisplay->init();
         adafruitDisplay->setRotation(3);
     }
-#elif defined(PCA10059)
+#elif defined(PCA10059) || defined(ME25LS01)
     {
         auto lowLevel = new EINK_DISPLAY_MODEL(PIN_EINK_CS, PIN_EINK_DC, PIN_EINK_RES, PIN_EINK_BUSY);
         adafruitDisplay = new GxEPD2_BW<EINK_DISPLAY_MODEL, EINK_DISPLAY_MODEL::HEIGHT>(*lowLevel);
-        adafruitDisplay->init(115200, true, 10, false, SPI1, SPISettings(4000000, MSBFIRST, SPI_MODE0));
-        adafruitDisplay->setRotation(3);
-        adafruitDisplay->setPartialWindow(0, 0, displayWidth, displayHeight);
+        adafruitDisplay->init(115200, true, 40, false, SPI1, SPISettings(4000000, MSBFIRST, SPI_MODE0));
+        adafruitDisplay->setRotation(0);
+        adafruitDisplay->setPartialWindow(0, 0, EINK_WIDTH, EINK_HEIGHT);
     }
 #elif defined(M5_COREINK)
     auto lowLevel = new EINK_DISPLAY_MODEL(PIN_EINK_CS, PIN_EINK_DC, PIN_EINK_RES, PIN_EINK_BUSY);

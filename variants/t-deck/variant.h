@@ -8,7 +8,7 @@
 #define ST7789_BUSY -1
 #define ST7789_BL 42
 #define ST7789_SPI_HOST SPI2_HOST
-#define ST7789_BACKLIGHT_EN 42
+#define TFT_BL 42
 #define SPI_FREQUENCY 40000000
 #define SPI_READ_FREQUENCY 16000000
 #define TFT_HEIGHT 320
@@ -27,9 +27,11 @@
 
 #define SLEEP_TIME 120
 
+#ifndef HAS_TFT
 #define BUTTON_PIN 0
 // #define BUTTON_NEED_PULLUP
-
+#endif
+#define GPS_DEFAULT_NOT_PRESENT 1
 #define GPS_RX_PIN 44
 #define GPS_TX_PIN 43
 
@@ -60,7 +62,7 @@
 #define TB_DOWN 15
 #define TB_LEFT 1
 #define TB_RIGHT 2
-#define TB_PRESS BUTTON_PIN
+#define TB_PRESS 0 // BUTTON_PIN
 
 // microphone
 #define ES7210_SCK 47
@@ -73,6 +75,7 @@
 #define DAC_I2S_BCK 7
 #define DAC_I2S_WS 5
 #define DAC_I2S_DOUT 6
+#define DAC_I2S_MCLK 21 // GPIO lrck mic
 
 // LoRa
 #define USE_SX1262

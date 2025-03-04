@@ -3,8 +3,8 @@
 #include "configuration.h"
 
 // DEBUG LED
-#ifndef LED_INVERTED
-#define LED_INVERTED 0 // define as 1 if LED is active low (on)
+#ifndef LED_STATE_ON
+#define LED_STATE_ON 1
 #endif
 
 // -----------------------------------------------------------------------------
@@ -61,6 +61,9 @@
 #define LOG_TRACE(...)
 #endif
 #endif
+
+/// A C wrapper for LOG_DEBUG that can be used from arduino C libs that don't know about C++ or meshtastic
+extern "C" void logLegacy(const char *level, const char *fmt, ...);
 
 #define SYSLOG_NILVALUE "-"
 

@@ -1,3 +1,4 @@
+#if RADIOLIB_EXCLUDE_SX127X != 1
 #include "RF95Interface.h"
 #include "MeshRadio.h" // kinda yucky, but we need to know which region we are in
 #include "RadioLibRF95.h"
@@ -8,6 +9,9 @@
 #include "PortduinoGlue.h"
 #endif
 
+#if ARCH_PORTDUINO
+#define RF95_MAX_POWER settingsMap[rf95_max_power]
+#endif
 #ifndef RF95_MAX_POWER
 #define RF95_MAX_POWER 20
 #endif
@@ -16,8 +20,7 @@
 // In theory up to 27 dBm is possible, but the modules installed in most radios can cope with a max of 20.  So BIG WARNING
 // if you set power to something higher than 17 or 20 you might fry your board.
 
-#define POWER_DEFAULT 17 // How much power to use if the user hasn't set a power level
-#ifdef RADIOMASTER_900_BANDIT_NANO
+#if defined(RADIOMASTER_900_BANDIT_NANO) || defined(RADIOMASTER_900_BANDIT)
 // Structure to hold DAC and DB values
 typedef struct {
     uint8_t dac;
@@ -41,12 +44,23 @@ DACDB getDACandDB(uint8_t dbm)
     static const struct {
         uint8_t dbm;
         DACDB values;
-    } dbmToDACDB[] = {
+    }
+#ifdef RADIOMASTER_900_BANDIT_NANO
+    dbmToDACDB[] = {
         {20, {168, 2}}, // 100mW
         {24, {148, 6}}, // 250mW
         {27, {128, 9}}, // 500mW
         {30, {90, 12}}  // 1000mW
     };
+#endif
+#ifdef RADIOMASTER_900_BANDIT
+    dbmToDACDB[] = {
+        {20, {165, 2}}, // 100mW
+        {24, {155, 6}}, // 250mW
+        {27, {142, 9}}, // 500mW
+        {30, {110, 10}} // 1000mW
+    };
+#endif
     const int numValues = sizeof(dbmToDACDB) / sizeof(dbmToDACDB[0]);
 
     // Find the interval dbm falls within and interpolate
@@ -57,7 +71,12 @@ DACDB getDACandDB(uint8_t dbm)
     }
 
     // Return a default value if no match is found and default to 100mW
+#ifdef RADIOMASTER_900_BANDIT_NANO
     DACDB defaultValue = {168, 2};
+#endif
+#ifdef RADIOMASTER_900_BANDIT
+    DACDB defaultValue = {165, 2};
+#endif
     return defaultValue;
 }
 #endif
@@ -66,7 +85,7 @@ RF95Interface::RF95Interface(LockingArduinoHal *hal, RADIOLIB_PIN_TYPE cs, RADIO
                              RADIOLIB_PIN_TYPE busy)
     : RadioLibInterface(hal, cs, irq, rst, busy)
 {
-    LOG_DEBUG("RF95Interface(cs=%d, irq=%d, rst=%d, busy=%d)\n", cs, irq, rst, busy);
+    LOG_DEBUG("RF95Interface(cs=%d, irq=%d, rst=%d, busy=%d)", cs, irq, rst, busy);
 }
 
 /** Some boards require GPIO control of tx vs rx paths */
@@ -75,16 +94,16 @@ void RF95Interface::setTransmitEnable(bool txon)
 #ifdef RF95_TXEN
     digitalWrite(RF95_TXEN, txon ? 1 : 0);
 #elif ARCH_PORTDUINO
-    if (settingsMap[txen] != RADIOLIB_NC) {
-        digitalWrite(settingsMap[txen], txon ? 1 : 0);
+    if (settingsMap[txen_pin] != RADIOLIB_NC) {
+        digitalWrite(settingsMap[txen_pin], txon ? 1 : 0);
     }
 #endif
 
 #ifdef RF95_RXEN
     digitalWrite(RF95_RXEN, txon ? 0 : 1);
 #elif ARCH_PORTDUINO
-    if (settingsMap[rxen] != RADIOLIB_NC) {
-        digitalWrite(settingsMap[rxen], txon ? 0 : 1);
+    if (settingsMap[rxen_pin] != RADIOLIB_NC) {
+        digitalWrite(settingsMap[rxen_pin], txon ? 0 : 1);
     }
 #endif
 }
@@ -96,7 +115,7 @@ bool RF95Interface::init()
 {
     RadioLibInterface::init();
 
-#ifdef RADIOMASTER_900_BANDIT_NANO
+#if defined(RADIOMASTER_900_BANDIT_NANO) || defined(RADIOMASTER_900_BANDIT)
     // DAC and DB values based on dBm using interpolation
     DACDB dacDbValues = getDACandDB(power);
     int8_t powerDAC = dacDbValues.dac;
@@ -118,7 +137,7 @@ bool RF95Interface::init()
     // enable PA
 #ifdef RF95_PA_EN
 #if defined(RF95_PA_DAC_EN)
-#ifdef RADIOMASTER_900_BANDIT_NANO
+#if defined(RADIOMASTER_900_BANDIT_NANO) || defined(RADIOMASTER_900_BANDIT)
     // Use calculated DAC value
     dacWrite(RF95_PA_EN, powerDAC);
 #else
@@ -148,24 +167,24 @@ bool RF95Interface::init()
     digitalWrite(RF95_RXEN, 1);
 #endif
 #if ARCH_PORTDUINO
-    if (settingsMap[txen] != RADIOLIB_NC) {
-        pinMode(settingsMap[txen], OUTPUT);
-        digitalWrite(settingsMap[txen], 0);
+    if (settingsMap[txen_pin] != RADIOLIB_NC) {
+        pinMode(settingsMap[txen_pin], OUTPUT);
+        digitalWrite(settingsMap[txen_pin], 0);
     }
-    if (settingsMap[rxen] != RADIOLIB_NC) {
-        pinMode(settingsMap[rxen], OUTPUT);
-        digitalWrite(settingsMap[rxen], 0);
+    if (settingsMap[rxen_pin] != RADIOLIB_NC) {
+        pinMode(settingsMap[rxen_pin], OUTPUT);
+        digitalWrite(settingsMap[rxen_pin], 0);
     }
 #endif
     setTransmitEnable(false);
 
     int res = lora->begin(getFreq(), bw, sf, cr, syncWord, power, preambleLength);
-    LOG_INFO("RF95 init result %d\n", res);
-    LOG_INFO("Frequency set to %f\n", getFreq());
-    LOG_INFO("Bandwidth set to %f\n", bw);
-    LOG_INFO("Power output set to %d\n", power);
-#ifdef RADIOMASTER_900_BANDIT_NANO
-    LOG_INFO("DAC output set to %d\n", powerDAC);
+    LOG_INFO("RF95 init result %d", res);
+    LOG_INFO("Frequency set to %f", getFreq());
+    LOG_INFO("Bandwidth set to %f", bw);
+    LOG_INFO("Power output set to %d", power);
+#if defined(RADIOMASTER_900_BANDIT_NANO) || defined(RADIOMASTER_900_BANDIT)
+    LOG_INFO("DAC output set to %d", powerDAC);
 #endif
 
     if (res == RADIOLIB_ERR_NONE)
@@ -204,17 +223,17 @@ bool RF95Interface::reconfigure()
 
     err = lora->setSyncWord(syncWord);
     if (err != RADIOLIB_ERR_NONE)
-        LOG_ERROR("Radiolib error %d when attempting RF95 setSyncWord!\n", err);
+        LOG_ERROR("RF95 setSyncWord %s%d", radioLibErr, err);
     assert(err == RADIOLIB_ERR_NONE);
 
     err = lora->setCurrentLimit(currentLimit);
     if (err != RADIOLIB_ERR_NONE)
-        LOG_ERROR("Radiolib error %d when attempting RF95 setCurrentLimit!\n", err);
+        LOG_ERROR("RF95 setCurrentLimit %s%d", radioLibErr, err);
     assert(err == RADIOLIB_ERR_NONE);
 
     err = lora->setPreambleLength(preambleLength);
     if (err != RADIOLIB_ERR_NONE)
-        LOG_ERROR("Radiolib error %d when attempting RF95 setPreambleLength!\n", err);
+        LOG_ERROR("RF95 setPreambleLength %s%d", radioLibErr, err);
     assert(err == RADIOLIB_ERR_NONE);
 
     err = lora->setFrequency(getFreq());
@@ -250,7 +269,7 @@ void RF95Interface::setStandby()
 {
     int err = lora->standby();
     if (err != RADIOLIB_ERR_NONE)
-        LOG_ERROR("Radiolib error %d when attempting RF95 standby!\n", err);
+        LOG_ERROR("RF95 standby %s%d", radioLibErr, err);
     assert(err == RADIOLIB_ERR_NONE);
 
     isReceiving = false; // If we were receiving, not any more
@@ -274,7 +293,7 @@ void RF95Interface::startReceive()
     setStandby();
     int err = lora->startReceive();
     if (err != RADIOLIB_ERR_NONE)
-        LOG_ERROR("Radiolib error %d when attempting RF95 startReceive!\n", err);
+        LOG_ERROR("RF95 startReceive %s%d", radioLibErr, err);
     assert(err == RADIOLIB_ERR_NONE);
 
     isReceiving = true;
@@ -292,14 +311,14 @@ bool RF95Interface::isChannelActive()
     result = lora->scanChannel();
 
     if (result == RADIOLIB_PREAMBLE_DETECTED) {
-        // LOG_DEBUG("Channel is busy!\n");
+        // LOG_DEBUG("Channel is busy!");
         return true;
     }
     if (result != RADIOLIB_CHANNEL_FREE)
-        LOG_ERROR("Radiolib error %d when attempting RF95 isChannelActive!\n", result);
+        LOG_ERROR("RF95 isChannelActive %s%d", radioLibErr, result);
     assert(result != RADIOLIB_ERR_WRONG_MODEM);
 
-    // LOG_DEBUG("Channel is free!\n");
+    // LOG_DEBUG("Channel is free!");
     return false;
 }
 
@@ -321,3 +340,4 @@ bool RF95Interface::sleep()
 
     return true;
 }
+#endif

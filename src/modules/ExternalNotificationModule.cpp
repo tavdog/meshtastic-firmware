@@ -397,7 +397,7 @@ ExternalNotificationModule::ExternalNotificationModule()
         } else {
             display.setRotation(3 + rc);
         }
-        display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 250, EPD_BLACK);
+        display.drawBitmap(0, 0, epd_bitmap_windy_tron_213_bw, 122, 260, EPD_BLACK);
         if (!config.display.flip_screen) {
             display.setRotation(2 + rc);
         } else {
@@ -406,7 +406,7 @@ ExternalNotificationModule::ExternalNotificationModule()
 
         display.setFont(&FreeMonoBold12pt7b);
         display.setTextColor(EPD_BLACK);
-        display.setCursor(2, 16);
+        display.setCursor(5, 20);
         if (strlen(devicestate.owner.long_name) < 9)
             display.setCursor(115, 50); // set short name lower inline with the windsock
         display.print(devicestate.owner.long_name);
@@ -727,13 +727,14 @@ void ExternalNotificationModule::displayWind(const meshtastic_MeshPacket &mp)
     // Get the channel name associated with the index
     const char *channelName = channels.getName(channelIndex);
 
-    int y_offset = 0;
+    int y_offset = 5;
     if (aux2[0] == '.')
-        y_offset = 22;
+        y_offset = 28;
+
     // we can move all fields down and display a long label at the very top.
     // DISPLAY LABEL normall but shorten if too long TODO
     display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(75, 16);
+    display.setCursor(75, 20);
     display.setTextColor(EPD_BLACK);
     display.print(channelName); // maximum 6
     // DISPLAY THE TIMESTAMP

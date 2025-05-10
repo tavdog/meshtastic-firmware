@@ -92,7 +92,7 @@ NRF52Bluetooth *nrf52Bluetooth = nullptr;
 #endif
 
 #if HAS_BUTTON || defined(ARCH_PORTDUINO)
-#include "ButtonThread.h"
+// #include "ButtonThread.h"
 #endif
 
 #include "AmbientLightingThread.h"
@@ -594,8 +594,8 @@ void setup()
         router = new ReliableRouter();
 
 #if HAS_BUTTON || defined(ARCH_PORTDUINO)
-    // Buttons. Moved here cause we need NodeDB to be initialized
-    buttonThread = new ButtonThread();
+        // Buttons. Moved here cause we need NodeDB to be initialized
+        // buttonThread = new ButtonThread();
 #endif
 
     playStartMelody();

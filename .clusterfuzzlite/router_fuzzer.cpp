@@ -82,7 +82,7 @@ void lateInitVariant()
         .settings =
             meshtastic_ChannelSettings{
                 .psk = {.size = 1, .bytes = {/*defaultpskIndex=*/1}},
-                .name = "LongFast",
+                .name = "DUALKPH",
                 .uplink_enabled = true,
                 .has_module_settings = true,
                 .module_settings = {.position_precision = 16},

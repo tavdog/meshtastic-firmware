@@ -65,6 +65,9 @@ bool externalCurrentState[3] = {};
 
 uint32_t externalTurnedOn[3] = {};
 
+uint8_t led_step = 0;
+#define LED_STATES 7
+
 static const char *rtttlConfigFile = "/prefs/ringtone.proto";
 
 int32_t ExternalNotificationModule::runOnce()
@@ -203,6 +206,8 @@ void ExternalNotificationModule::setExternalState(uint8_t index, bool on)
     default:
         if (output > 0)
             digitalWrite(output, (moduleConfig.external_notification.active ? on : !on));
+        // set the led state here to keep track of where the led step is so we can turn it off if we want to.
+        led_step = led_step % 7;
         break;
     }
 
@@ -236,6 +241,19 @@ bool ExternalNotificationModule::nagging()
     return isNagging;
 }
 
+void ExternalNotificationModule::ledOff()
+{
+    // take led_step % 7 and pulse output the resultant number of time.
+    // Turn off the led by cycling until led_step = 0
+    LOG_INFO("Turning off LED");
+
+    for (int i = led_step % LED_STATES; i > = ; i++) {
+        setExternalState(0, true);
+        delay(250);
+        setExternalState(0, false);
+        delay(250);
+    }
+}
 void ExternalNotificationModule::stopNow()
 {
     LOG_INFO("Turning off external notification: ");

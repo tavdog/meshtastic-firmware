@@ -23,6 +23,7 @@
 #include "main.h"
 #include "mesh/generated/meshtastic/rtttl.pb.h"
 #include <Arduino.h>
+#include <cstring>
 
 #if defined(HAS_RGB_LED)
 #include "AmbientLightingThread.h"
@@ -241,19 +242,37 @@ bool ExternalNotificationModule::nagging()
     return isNagging;
 }
 
-void ExternalNotificationModule::ledOff()
+void ExternalNotificationModule::cycleLedOff(bool force)
 {
     // take led_step % 7 and pulse output the resultant number of time.
     // Turn off the led by cycling until led_step = 0
     LOG_INFO("Turning off LED");
 
-    for (int i = led_step % LED_STATES; i > = ; i++) {
+    if (led_step == 0 && !force)
+        return;
+
+    for (int i = LED_STATES - led_step; i > 0; i--) {
         setExternalState(0, true);
-        delay(250);
+        delay(125);
         setExternalState(0, false);
-        delay(250);
+        delay(125);
     }
+    led_step = 0;
 }
+void ExternalNotificationModule::cycleLedX(uint8_t colorNum)
+{
+    LOG_INFO("Cycling to led index %d", colorNum);
+    if (colorNum <= led_step)
+        colorNum += LED_STATES;
+    for (int i = colorNum - led_step; i > 0; i--) {
+        setExternalState(0, true);
+        delay(125);
+        setExternalState(0, false);
+        delay(125);
+    }
+    led_step = colorNum % LED_STATES;
+}
+
 void ExternalNotificationModule::stopNow()
 {
     LOG_INFO("Turning off external notification: ");
@@ -398,6 +417,37 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
             const bool buzzerModeIsDirectOnly =
                 (config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_DIRECT_MSG_ONLY);
 
+            // Check for the word off in the message and trigger the ledOff function
+            char msg[70] = "";
+            sprintf(msg, "%s", p.payload.bytes);
+            if (strcmp(msg, "off") == 0) {
+                cycleLedOff(true);
+                is_muted = true; // fake muted so nothing else happens.
+            } else if (strcmp(msg, "reset") == 0) {
+                led_step = 0;
+                is_muted = true;
+            } else if (strlen(msg) == 1 && msg[0] >= '1' && msg[0] <= '6') {
+                int colorNum = msg[0] - '0';
+                cycleLedX(colorNum);
+                is_muted = true;
+            } else if (strlen(msg) == 1) {
+                int colorNum = 0;
+                if (msg[0] == 'r')
+                    colorNum = 1;
+                else if (msg[0] == 'g')
+                    colorNum = 2;
+                else if (msg[0] == 'b')
+                    colorNum = 3;
+                else if (msg[0] == 'o')
+                    colorNum = 4;
+                else if (msg[0] == 'v')
+                    colorNum = 5;
+                if (colorNum > 0) {
+                    cycleLedX(colorNum);
+                    is_muted = true;
+                }
+            }
+
             if (containsBell || !is_muted) {
                 if (moduleConfig.external_notification.alert_bell || moduleConfig.external_notification.alert_message ||
                     moduleConfig.external_notification.alert_bell_vibra ||
@@ -415,6 +465,8 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                 if (moduleConfig.external_notification.alert_bell || moduleConfig.external_notification.alert_message) {
                     LOG_INFO("externalNotificationModule - Notification Module or Bell");
                     setExternalState(0, true);
+                    led_step = (led_step + 1) % LED_STATES;
+                    LOG_INFO("Set led_step to %d", led_step);
                 }
 
                 if (moduleConfig.external_notification.alert_bell_vibra ||

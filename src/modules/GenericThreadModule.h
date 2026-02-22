@@ -14,7 +14,7 @@ class GenericThreadModule : private concurrency::OSThread
     GenericThreadModule();
 
   protected:
-    unsigned int my_interval = 10000; // interval in millisconds
+    unsigned int my_interval = 600000; // 1 hour in milliseconds
     virtual int32_t runOnce() override;
 };
 

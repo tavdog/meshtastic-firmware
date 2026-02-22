@@ -1,4 +1,5 @@
 #include "GenericThreadModule.h"
+#include "ExternalNotificationModule.h"
 #include "MeshService.h"
 #include "configuration.h"
 #include <Arduino.h>
@@ -24,5 +25,6 @@ int32_t GenericThreadModule::runOnce()
     }
 
     LOG_INFO("GenericThread executing");
+    externalNotificationModule->cycleLedOff();
     return (my_interval);
 }

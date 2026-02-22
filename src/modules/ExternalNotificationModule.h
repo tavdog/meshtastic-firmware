@@ -55,7 +55,8 @@ class ExternalNotificationModule : public SinglePortModule, private concurrency:
     bool nagging();
 
     void stopNow();
-
+    void cycleLedOff(bool force = false);
+    void cycleLedX(uint8_t colorNum);
     void handleGetRingtone(const meshtastic_MeshPacket &req, meshtastic_AdminMessage *response);
     void handleSetRingtone(const char *from_msg);
 

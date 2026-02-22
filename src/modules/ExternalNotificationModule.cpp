@@ -242,7 +242,7 @@ bool ExternalNotificationModule::nagging()
 
 void ExternalNotificationModule::cycleLedOff(bool force)
 {
-    // take led_step % 7 and pulse output the resultant number of time.
+    // take LED_STATES - led_step and pulse output the resultant number of time to get to 0
     // Turn off the led by cycling until led_step = 0
     LOG_INFO("Turning off LED");
 

@@ -432,16 +432,18 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                 is_muted = true;
             } else if (strlen(msg) == 1) {
                 int colorNum = 0;
-                if (msg[0] == 'r')
+                if (msg[0] == 'w')
                     colorNum = 1;
-                else if (msg[0] == 'g')
+                else if (msg[0] == 'r')
                     colorNum = 2;
-                else if (msg[0] == 'b')
+                else if (msg[0] == 'g')
                     colorNum = 3;
-                else if (msg[0] == 'o')
+                else if (msg[0] == 'b')
                     colorNum = 4;
-                else if (msg[0] == 'v')
+                else if (msg[0] == 'o')
                     colorNum = 5;
+                else if (msg[0] == 'v')
+                    colorNum = 6;
                 if (colorNum > 0) {
                     cycleLedX(colorNum);
                     is_muted = true;

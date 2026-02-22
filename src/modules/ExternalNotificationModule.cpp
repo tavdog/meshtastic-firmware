@@ -207,8 +207,6 @@ void ExternalNotificationModule::setExternalState(uint8_t index, bool on)
     default:
         if (output > 0)
             digitalWrite(output, (moduleConfig.external_notification.active ? on : !on));
-        // set the led state here to keep track of where the led step is so we can turn it off if we want to.
-        led_step = led_step % 7;
         break;
     }
 

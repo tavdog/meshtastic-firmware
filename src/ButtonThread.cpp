@@ -162,7 +162,7 @@ int32_t ButtonThread::runOnce()
             // iterate channel downlinks
             channels.cycleMqttDownlink();
 
-            nodeDB->saveChannelsToDisk();
+            nodeDB->saveToDisk(SEGMENT_CHANNELS);
 
             rebootAtMsec = 1;
 
